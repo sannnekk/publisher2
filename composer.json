@@ -1,20 +1,21 @@
 {
-    "name": "hmnet/publisher-2",
-    "description": "A new sftp publisher for nobisdesign",
-    "type": "project",
-    "autoload": {
-        "psr-4": {
-            "HMnet\\Publisher2\\": "src/"
-        }
-    },
-    "authors": [
-        {
-            "name": "sannnekk",
-            "homepage": "https://alexander.net.ua"
-        }
-    ],
-    "require": {
-        "vlucas/phpdotenv": "^5.6",
-        "adhocore/cli": "^v1.0.0"
-    }
+	"name": "hmnet/publisher-2",
+	"description": "A new sftp publisher for nobisdesign",
+	"type": "project",
+	"autoload": {
+		"psr-4": {
+			"HMnet\\Publisher2\\": "src/"
+		}
+	},
+	"authors": [
+		{
+			"name": "sannnekk",
+			"homepage": "https://alexander.net.ua"
+		}
+	],
+	"require": {
+		"vlucas/phpdotenv": "^5.6",
+		"adhocore/cli": "^v1.0.0",
+		"guzzlehttp/guzzle": "^7.0"
+	}
 }

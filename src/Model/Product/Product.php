@@ -1,10 +1,14 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace HMnet\Publisher2\Model\Product;
 
 use HMnet\Publisher2\Model\Model;
+use HMnet\Publisher2\Util\ProductCollection;
 
-class Product extends Model {
+class Product extends Model
+{
 	public readonly string $productNumber;
 	public string $name;
 	public string $publisher;
@@ -21,11 +25,32 @@ class Product extends Model {
 	public bool $isCloseout = true;
 
 	// compound values
+
+	/**
+	 * @var Price[]
+	 */
 	private array $price = [];
+
+	/**
+	 * @var AdditionalPrice[]
+	 */
+	private array $prices = [];
+
+	/**
+	 * @var Visibility[]
+	 */
 	private array $visibilities = [];
+
+	/**
+	 * @var SearchKeyword[]
+	 */
 	private array $searchKeywords = [];
 
 	// category ids
+
+	/**
+	 * @var string[]
+	 */
 	private array $categories = [];
 
 	// default ids
@@ -44,36 +69,57 @@ class Product extends Model {
 		$this->taxId = $_ENV['SW_TAX_ID'];
 	}
 
-	public function id(): string {
+	public static function name(): string
+	{
+		return 'product';
+	}
+
+	public function id(): string
+	{
 		return md5($this->productNumber);
 	}
 
-	public function setPrice(int $price): void {
+	public function setPrice(int $price): void
+	{
 		$this->price = [new Price($this->id(), $price)];
 	}
 
-	public function addCategory(string $categoryId): void {
-		$this->categories[] = $categoryId;
+	public function addAdditionalPrice(AdditionalPrice $additionalPrice): void
+	{
+		$this->prices[] = $additionalPrice;
 	}
 
-	public function dontSyncCategories(): void {
+	/**
+	 * @param array<string> $categoryIds
+	 */
+	public function addCategoryIds(array $categoryIds): void
+	{
+		$this->categories = $categoryIds;
+	}
+
+	public function dontSyncCategories(): void
+	{
 		$this->dontSyncCategories = true;
 	}
 
-	public function addSearchKeyword(string $keyword): void {
+	public function addSearchKeyword(string $keyword): void
+	{
 		$this->searchKeywords[] = new SearchKeyword($this->id(), $keyword, 'de');
 		$this->searchKeywords[] = new SearchKeyword($this->id(), $keyword, 'en');
 	}
 
-	public function setVisibility(): void {
+	public function setVisibility(): void
+	{
 		$this->visibilities = [new Visibility($this->id())];
 	}
 
-	public function isXProduct(): bool {
+	public function isXProduct(): bool
+	{
 		return strpos($this->productNumber, 'x') !== false;
 	}
 
-	public function serialize(): array {
+	public function serialize(): array
+	{
 		$serialized = [
 			'productNumber' => $this->productNumber,
 			'name' => $this->name,
@@ -86,9 +132,10 @@ class Product extends Model {
 			'releaseDate' => $this->releaseDate->format($_ENV['DATE_FORMAT']),
 			'active' => $this->active,
 			'isCloseout' => $this->isCloseout,
-			'price' => array_map(fn($price) => $price->serialize(), $this->price),
-			'visibilities' => array_map(fn($visibility) => $visibility->serialize(), $this->visibilities),
-			'searchKeywords' => array_map(fn($keyword) => $keyword->serialize(), $this->searchKeywords),
+			'price' => array_map(fn ($price) => $price->serialize(), $this->price),
+			'prices' => array_map(fn ($price) => $price->serialize(), $this->prices),
+			'visibilities' => array_map(fn ($visibility) => $visibility->serialize(), $this->visibilities),
+			'searchKeywords' => array_map(fn ($keyword) => $keyword->serialize(), $this->searchKeywords),
 			'cmsPageId' => $this->cmsPageId,
 			'taxId' => $this->taxId,
 			// !IMPORTANT: 
@@ -107,12 +154,14 @@ class Product extends Model {
 		return $serialized;
 	}
 
-	private function getManufacturerNumber(): string {
+	private function getManufacturerNumber(): string
+	{
 		return $this->minPurchase . '|' . $this->purchaseSteps;
 	}
 
-	public static function fromCSVRow(array $csv): Product {
-		$product = new Product($_ENV['PRODUCT_NUMBER_PREFIX'] . $csv['TITEL_NR']);
+	public static function fromCSVRow(array $csv): Product
+	{
+		$product = new Product(self::productNumberFromCSV($csv));
 		$product->productNumber = $csv['TITEL_NR'];
 		$product->name = $csv['BEZEICHNUNG1'];
 		$product->publisher = $csv['VERLAG'];
@@ -127,7 +176,20 @@ class Product extends Model {
 		return $product;
 	}
 
-	public static function fromCSV(array $csv): array {
-		return array_map(fn($row) => self::fromCSVRow($row), $csv);
+	public static function fromCSV(array $csv): ProductCollection
+	{
+		$products = [];
+
+		foreach ($csv as $row) {
+			$productNumber = self::productNumberFromCSV($row);
+			$products[] = Product::fromCSVRow($row);
+		}
+
+		return new ProductCollection($products);
+	}
+
+	public static function productNumberFromCSV($csv): string
+	{
+		return $_ENV['PRODUCT_NUMBER_PREFIX'] . $csv['TITEL_NR'];
 	}
 }

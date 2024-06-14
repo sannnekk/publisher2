@@ -1,17 +1,26 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace HMnet\Publisher2\Model\Product;
 
 use HMnet\Publisher2\Model\Model;
 
-class SearchKeyword extends Model {
+class SearchKeyword extends Model
+{
 	public string $productId;
 	public string $languageId;
 	public string $keyword;
 	public int $ranking = 0;
 
-	public function id(): string {
+	public function id(): string
+	{
 		return md5($this->productId . $this->keyword);
+	}
+
+	public static function name(): string
+	{
+		return 'search-keyword';
 	}
 
 	/**
@@ -21,7 +30,8 @@ class SearchKeyword extends Model {
 	 * @param string $keyword
 	 * @param string $language [values: 'de', 'en']
 	 */
-	public function __construct(string $productId, string $keyword, string $language = 'de') {
+	public function __construct(string $productId, string $keyword, string $language = 'de')
+	{
 		$this->productId = $productId;
 		$this->keyword = $keyword;
 		$this->languageId = $this->getLanguageId($language);
@@ -38,7 +48,8 @@ class SearchKeyword extends Model {
 		];
 	}
 
-	private function getLanguageId(string $language): string {
+	private function getLanguageId(string $language): string
+	{
 		switch ($language) {
 			case 'de':
 				return $_ENV['SW_LANGUAGE_DE'];

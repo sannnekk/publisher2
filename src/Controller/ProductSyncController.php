@@ -1,30 +1,43 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace HMnet\Publisher2\Controller;
 
 use HMnet\Publisher2\Log\Statistics;
 use HMnet\Publisher2\Model\Product\Product;
+use HMnet\Publisher2\Model\Category\Category;
 use HMnet\Publisher2\Services\Api\ShopwareService;
 use HMnet\Publisher2\Services\Csv\CsvParsingService;
+use HMnet\Publisher2\Model\Local\Stock;
+use HMnet\Publisher2\Model\Local\Image;
+use HMnet\Publisher2\Model\Product\AdditionalPrice;
 
-class ProductSyncController extends Controller {
+class ProductSyncController extends Controller
+{
 	private readonly CsvParsingService $csvParsingService;
 	private readonly ShopwareService $shopwareService;
 
-	public function __construct(array $options) {
+	public function __construct(array $options)
+	{
 		parent::__construct($options);
 
 		$this->csvParsingService = new CsvParsingService([
-			'delimiter' => ';',
+			'delimiter' => '|',
 			'enclosure' => '"',
 			'escape' => '\\',
 		]);
-		$this->shopwareService = new ShopwareService($_ENV['SW_API_URL']);
+		$this->shopwareService = new ShopwareService(
+			$_ENV['SW_API_URL'],
+			$_ENV['SW_ADMIN_USER'],
+			$_ENV['SW_ADMIN_PASSWORD']
+		);
 	}
 
-	public function handle(array $options): Statistics {
+	public function handle(array $options): Statistics
+	{
 		$statistics = new Statistics();
-		
+
 		// 1. Parse CSV files
 		$files = [
 			'products' => $_ENV['CSV_PRODUCTS_FILE'],
@@ -44,41 +57,41 @@ class ProductSyncController extends Controller {
 
 		// 3. Filter out products with 'x' in product number if option is set
 		if ($this->options['sort-x-out']) {
-			foreach ($products as &$product) {
-				if ($product->isXProduct()) {
-					$product->dontSyncCategories();
-				}
-			}
+			$products->dontSyncXProductCategories();
 		}
 
 		// 4. Set stocks if option is set
 		if ($this->options['with-stocks']) {
-			// TODO: Implement
+			$stocks = Stock::fromCSV($data['stocks']);
+			$products->addStocks($stocks);
 		}
 
 		// 5. Set prices if option is set
 		if ($this->options['with-prices']) {
-			// TODO: Implement
+			$prices = AdditionalPrice::fromCSV($products, $data['prices']);
+			$products->addAdditionalPrices($prices);
 		}
 
 		// 6. Set categories if option is set
 		if ($this->options['with-categories']) {
-			// TODO: Implement
+			$categories = Category::fromCSV($data['categories']);
+			$products->addCategories($categories);
+
+			$this->shopwareService->syncEntities($categories);
 		}
 
 		// 7. Sync products
-		foreach ($products as $product) {
-			// TODO: Implement
-		}
+		$this->shopwareService->syncEntities($products->toArray());
 
 		// 8. Remove orphans if option is set
 		if ($this->options['remove-orphans']) {
-			// TODO: Implement
+			$this->shopwareService->removeOrphants($products->toArray());
 		}
 
 		// 9. Upload images if option is set
 		if ($this->options['with-images']) {
-			// TODO: Implement
+			$images = Image::fromFolder($_ENV['IMAGES_FOLDER']);
+			$this->shopwareService->uploadImages($images);
 		}
 
 		return $statistics;
