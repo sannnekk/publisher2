@@ -50,6 +50,9 @@ class CsvParsingService
 			// trim all values
 			$row = array_map('trim', $row);
 
+			// convert all values to UTF-8
+			$row = array_map([self::class, 'utf8ize'], $row);
+
 			// convert numeric values to float
 			$row = array_map(function ($value) {
 				return $this->convertToFloatIfNumeric($value) ?? $value;
@@ -81,5 +84,16 @@ class CsvParsingService
 		}
 
 		return null;
+	}
+
+	/**
+	 * Convert string to UTF-8
+	 * 
+	 * @param string $data
+	 * @return array
+	 */
+	private static function utf8ize(string $data)
+	{
+		return iconv('windows-1252', 'utf8', $data);
 	}
 }

@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace HMnet\Publisher2\Services\Api;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use HMnet\Publisher2\Log\LoggerInterface;
 use HMnet\Publisher2\Log\Logger;
-use HMnet\Publisher2\Model\Product\ProductMedia;
 use HMnet\Publisher2\Model\Model;
-use GuzzleHttp\Exception\ClientException;
+use HMnet\Publisher2\Model\Local\Criteria\Criteria;
+use HMnet\Publisher2\Model\Product\ProductMedia;
 
 class ShopwareService
 {
@@ -89,7 +90,7 @@ class ShopwareService
 					[
 						'entity' => $entityName,
 						'action' => 'upsert',
-						'payload' => self::utf8ize(array_map(fn ($entity) => $entity->serialize(), $entities)),
+						'payload' => array_map(fn ($entity) => $entity->serialize(), $entities),
 					]
 				],
 			]);
@@ -238,6 +239,80 @@ class ShopwareService
 	}
 
 	/**
+	 * Get entities from Shopware
+	 * 
+	 * @param string $entityClass
+	 * @param Criteria $criteria
+	 * @return array<Model>
+	 */
+	public function getEntities(string $entityClass, Criteria $criteria): array
+	{
+		$entities = [];
+
+		if ($entityClass::name() === null) {
+			throw new \Exception('Entity is local only and cannot be loaded from Shopware');
+		}
+
+		if (!method_exists($entityClass, 'fromSWResponse')) {
+			throw new \Exception('Entity should implement \HMnet\Publish2\Model\IConstructableFromSWResponse interface');
+		}
+
+		$entityName = $entityClass::name();
+
+		try {
+			$response = $this->httpClient->get('search/' . $entityName, [
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->token,
+					'Accept' => 'application/json',
+				],
+				'json' => $criteria->serialize(),
+			]);
+
+			$responseCode = $response->getStatusCode();
+			$response = json_decode($response->getBody()->getContents(), true);
+
+			if ($responseCode > 299 || $responseCode < 200) {
+				throw new \Exception('Failed to get entities from Shopware, response code: ' . $responseCode);
+			}
+
+			$entities = array_map(fn ($entity) => $entity::fromSWResponse($entity), $response['data']);
+		} catch (\Exception $e) {
+			throw new \Exception('Failed to get entities from Shopware, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+		}
+
+		return $entities;
+	}
+
+	/**
+	 * Set order status
+	 * 
+	 * @param string $orderId
+	 * @param string $status (values: 'process', 'complete')
+	 */
+	public function setOrderStatus(string $orderId, string $status): void
+	{
+		try {
+			$response = $this->httpClient->post("_action/order/$orderId/state/$status" . $orderId, [
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->token
+				]
+			]);
+
+			$responseCode = $response->getStatusCode();
+			$response = json_decode($response->getBody()->getContents(), true);
+
+			if ($responseCode > 299 || $responseCode < 200) {
+				$this->logger->error("Failed to set order status, response code: $responseCode");
+				return;
+			}
+
+			$this->logger->info("Set order status to $status for order $orderId");
+		} catch (\Exception $e) {
+			$this->logger->error("Failed to set order status for order $orderId, message: " . $e->getMessage() . ', code: ' . $e->getCode());
+		}
+	}
+
+	/**
 	 * Upload images to Shopware
 	 * 
 	 * @param array<ProductMedia> $images
@@ -286,25 +361,5 @@ class ShopwareService
 			//$this->logger->error('Image upload failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
 			return false;
 		}
-	}
-
-	/**
-	 * Convert multi-dimensional array to UTF-8
-	 * 
-	 * @param array $data
-	 * @return array
-	 */
-	private static function utf8ize($data)
-	{
-		if (is_array($data)) {
-
-			foreach ($data as $key => $value) {
-				$data[$key] = self::utf8ize($value);
-			}
-		} elseif (is_string($data)) {
-			return mb_convert_encoding($data, "UTF-8", "UTF-8");
-		}
-
-		return $data;
 	}
 }

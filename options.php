@@ -3,18 +3,6 @@
 $CLI_OPTIONS = [
 	'help' => [],
 	'sync-products' => [
-		'limit' => [
-			'type' => 'number',
-			'default' => 300,
-			'description' => 'Anzahl der Produkte, die synchronisiert werden',
-			'alias' => ['l']
-		],
-		'offset' => [
-			'type' => 'number',
-			'default' => 0,
-			'description' => 'Offset der Produkte, die synchronisiert werden',
-			'alias' => ['o']
-		],
 		'remove-orphans' => [
 			'type' => 'number',
 			'default' => false,
@@ -54,6 +42,7 @@ $CLI_OPTIONS = [
 	],
 	'complete-orders' => [
 		'limit' => [
+			'type' => 'number',
 			'default' => 300,
 			'description' => 'Anzahl der Bestellungen, die abgeschlossen werden',
 			'alias' => ['l']

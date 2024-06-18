@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace HMnet\Publisher2\Log;
 
 use DateTime;
+use DateTimeImmutable;
 
 class Logger implements LoggerInterface
 {
 	private string $logFile;
 	private int $nestingLevel;
+	private static ?DateTimeImmutable $sriptStartTime = null;
 
 	public function __construct(int $nestingLevel = 0)
 	{
-		$this->logFile = 'logs/' . (new DateTime())->format('Y-m-d_H_i_s') . '.log';
+		if (self::$sriptStartTime === null) {
+			self::$sriptStartTime = new DateTimeImmutable();
+		}
+
+		$this->logFile = 'logs/' . self::$sriptStartTime->format('Y-m-d_H_i_s') . '.log';
 		$this->nestingLevel = $nestingLevel;
 
 		if (!file_exists('logs')) {
@@ -39,9 +45,10 @@ class Logger implements LoggerInterface
 	private function message(string $level, string $message): string
 	{
 		return sprintf(
-			'[%s] %s: %s' . str_repeat(" -", $this->nestingLevel) . PHP_EOL,
+			'[%s] %s: %s %s' . PHP_EOL,
 			(new DateTime())->format('Y-m-d H:i:s'),
 			$level,
+			str_repeat(' -', $this->nestingLevel),
 			$message
 		);
 	}

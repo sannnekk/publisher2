@@ -1,6 +1,7 @@
 # SW Publisher
 
 PHP command line tool to sync product data in csv with data in Shopware 6.
+Works only from server! It means, the root folder should be available through the URL.
 
 ### Requires:
 
@@ -8,8 +9,3 @@ PHP command line tool to sync product data in csv with data in Shopware 6.
 - Curl
 - PHP 8.1 or higher
 - Shopware 6.5 or newer
-
-### Todo:
-
-- Logging
-- complete orders
