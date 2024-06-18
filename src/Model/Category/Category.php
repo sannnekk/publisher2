@@ -6,6 +6,7 @@ namespace HMnet\Publisher2\Model\Category;
 
 use HMnet\Publisher2\Model\Model;
 use HMnet\Publisher2\Model\Product\Product;
+use HMnet\Publisher2\Model\Collection\CategoryCollection;
 
 class Category extends Model
 {
@@ -39,6 +40,10 @@ class Category extends Model
 		$this->id = $id;
 		$this->name = $name;
 		$this->parentId = $parentId ?? $_ENV['SW_ROOT_CATEGORY_ID'];
+
+		// defaults
+		$this->salesChannelId = $_ENV['SW_SALES_CHANNEL_ID'];
+		$this->cmsPageId = $_ENV['SW_CATEGORY_LAYOUT_ID'];
 	}
 
 	public function getChildren(): array
@@ -46,7 +51,7 @@ class Category extends Model
 		return array_values($this->children);
 	}
 
-	public function getLeafIds(): array
+	public function getLeafIds($level = 0): array
 	{
 		$leafIds = [];
 
@@ -54,7 +59,7 @@ class Category extends Model
 			if (empty($child->children)) {
 				$leafIds[] = $child->id;
 			} else {
-				$leafIds = array_merge($leafIds, $child->getLeafIds());
+				$leafIds = array_merge($leafIds, $child->getLeafIds($level + 1));
 			}
 		}
 
@@ -80,16 +85,16 @@ class Category extends Model
 	 * Create trees of categories for each product
 	 * 
 	 * @param array<array<string>> $csv
-	 * @return array<string, array<string, Category>>
+	 * @return CategoryCollection
 	 */
-	public static function fromCSV(array $csv): array
+	public static function fromCSV(array $csv): CategoryCollection
 	{
 		$trees = [];
 
 		foreach ($csv as $row) {
 			$productNumber = Product::productNumberFromCSV($row);
-			$csvId = $row['csvId'];
-			$path = explode('#', $row['path']);
+			$csvId = $row['WEB_GRP'];
+			$path = explode('#', $row['WEB_GRP_T']);
 
 			if (!isset($trees[$productNumber])) {
 				$trees[$productNumber] = [];
@@ -98,10 +103,17 @@ class Category extends Model
 			self::createOrUpdateTree($trees[$productNumber], $csvId, $path);
 		}
 
-		return $trees;
+		return new CategoryCollection($trees);
 	}
 
-	private static function createOrUpdateTree(Category &$tree, string $csvId, array $path)
+	/**
+	 * Create or update the tree of categories
+	 * 
+	 * @param array<string, Category> $tree
+	 * @param string $csvId
+	 * @param array<string> $path
+	 */
+	private static function createOrUpdateTree(array &$tree, string $csvId, array $path): void
 	{
 		$id = Category::id($csvId);
 		$parentId = null;

@@ -5,24 +5,25 @@ declare(strict_types=1);
 namespace HMnet\Publisher2\Model\Product;
 
 use HMnet\Publisher2\Model\Model;
-use HMnet\Publisher2\Util\ProductCollection;
+use HMnet\Publisher2\Model\Collection\ProductCollection;
+use HMnet\Publisher2\Model\Product\ProductMedia;
 
 class Product extends Model
 {
 	public readonly string $productNumber;
 	public string $name;
-	public string $publisher;
-	public int $weight;
-	public int $width;
-	public int $height;
-	public int $stock;
+	public float $weight = 0;
+	public float $width = 0;
+	public float $height = 0;
+	public int $stock = 0;
 	public int $restockTime = 1;
-	public int $ean;
-	public int $minPurchase;
-	public int $purchaseSteps;
-	public \DateTime $releaseDate;
+	public int $minPurchase = 1;
+	public int $purchaseSteps = 3;
+	public string $ean = "";
+	public ?\DateTime $releaseDate = null;
 	public bool $active = true;
 	public bool $isCloseout = true;
+	public array $customSearchKeywords = [];
 
 	// compound values
 
@@ -42,16 +43,17 @@ class Product extends Model
 	private array $visibilities = [];
 
 	/**
-	 * @var SearchKeyword[]
+	 * @var array<ProductMedia>
 	 */
-	private array $searchKeywords = [];
+	private array $media = [];
+	private string $coverId;
 
 	// category ids
 
 	/**
 	 * @var string[]
 	 */
-	private array $categories = [];
+	private array $categoryIds = [];
 
 	// default ids
 	private string $cmsPageId;
@@ -79,9 +81,9 @@ class Product extends Model
 		return md5($this->productNumber);
 	}
 
-	public function setPrice(int $price): void
+	public function setPrice(float $price): void
 	{
-		$this->price = [new Price($this->id(), $price)];
+		$this->price = [new Price($this->id(), $price, 'gross')];
 	}
 
 	public function addAdditionalPrice(AdditionalPrice $additionalPrice): void
@@ -94,7 +96,7 @@ class Product extends Model
 	 */
 	public function addCategoryIds(array $categoryIds): void
 	{
-		$this->categories = $categoryIds;
+		$this->categoryIds = array_map(fn ($id) => ["id" => $id], $categoryIds);
 	}
 
 	public function dontSyncCategories(): void
@@ -104,8 +106,13 @@ class Product extends Model
 
 	public function addSearchKeyword(string $keyword): void
 	{
-		$this->searchKeywords[] = new SearchKeyword($this->id(), $keyword, 'de');
-		$this->searchKeywords[] = new SearchKeyword($this->id(), $keyword, 'en');
+		$this->customSearchKeywords[] = $keyword;
+	}
+
+	public function addMedia(ProductMedia $media): void
+	{
+		$this->media[] = $media;
+		$this->coverId = $media->id();
 	}
 
 	public function setVisibility(): void
@@ -115,12 +122,13 @@ class Product extends Model
 
 	public function isXProduct(): bool
 	{
-		return strpos($this->productNumber, 'x') !== false;
+		return str_contains($this->productNumber, 'x');
 	}
 
 	public function serialize(): array
 	{
 		$serialized = [
+			'id' => $this->id(),
 			'productNumber' => $this->productNumber,
 			'name' => $this->name,
 			'weight' => $this->weight,
@@ -135,20 +143,28 @@ class Product extends Model
 			'price' => array_map(fn ($price) => $price->serialize(), $this->price),
 			'prices' => array_map(fn ($price) => $price->serialize(), $this->prices),
 			'visibilities' => array_map(fn ($visibility) => $visibility->serialize(), $this->visibilities),
-			'searchKeywords' => array_map(fn ($keyword) => $keyword->serialize(), $this->searchKeywords),
+			'customSearchKeywords' => $this->customSearchKeywords,
 			'cmsPageId' => $this->cmsPageId,
 			'taxId' => $this->taxId,
 			// !IMPORTANT: 
-			// this is the field that is used to tell minPurchase and purchaseSteps for companies
+			// manufacturerNumber is the field that is used to tell minPurchase and purchaseSteps for companies
 			// as Shopware doesnt allow to have different minPurchase and purchaseSteps for different customer groups.
 			// An extension in Shopware called 'HMnetCartRecalculator' is needed to make this work.
+			// The value of manufacturerNumber is a string that contains actual minPurchase and purchaseSteps separated by '|'.
+			// minPurchase MUST be 1
+			// purchaseSteps MUST be 1
 			'manufacturerNumber' => $this->getManufacturerNumber(),
 			'minPurchase' => 1,
 			'purchaseSteps' => 1,
 		];
 
 		if (!$this->dontSyncCategories) {
-			$serialized['categories'] = $this->categories;
+			$serialized['categories'] = $this->categoryIds;
+		}
+
+		if (!empty($this->coverId)) {
+			$serialized['coverId'] = $this->coverId;
+			$serialized['media'] = array_map(fn ($media) => $media->serialize(), $this->media);
 		}
 
 		return $serialized;
@@ -159,30 +175,40 @@ class Product extends Model
 		return $this->minPurchase . '|' . $this->purchaseSteps;
 	}
 
-	public static function fromCSVRow(array $csv): Product
+	public static function fromCSVRow(array $csv, array $priceRow): Product
 	{
 		$product = new Product(self::productNumberFromCSV($csv));
-		$product->productNumber = $csv['TITEL_NR'];
 		$product->name = $csv['BEZEICHNUNG1'];
-		$product->publisher = $csv['VERLAG'];
-		$product->weight = $csv['GEWICHT_GR'];
-		$product->width = $csv['LAENGE_MM'];
-		$product->height = $csv['BREITE_MM'];
+		$product->weight = (float) $csv['GEWICHT_GR'];
+		$product->width = (float) $csv['LAENGE_MM'];
+		$product->height = (float) $csv['BREITE_MM'];
 		$product->ean = $csv['EAN_NR'];
 		$product->releaseDate = new \DateTime($csv['ERSCHEINUNG']);
 
 		$product->setVisibility();
+		$product->setPrice((float) $priceRow['WERT1']);
+
+		// add search keyword for product number without prefix
+		$product->addSearchKeyword(substr($product->productNumber, 2));
 
 		return $product;
 	}
 
-	public static function fromCSV(array $csv): ProductCollection
+	public static function fromCSV(array $csv, array $prices): ProductCollection
 	{
 		$products = [];
 
 		foreach ($csv as $row) {
 			$productNumber = self::productNumberFromCSV($row);
-			$products[] = Product::fromCSVRow($row);
+			$priceRows = array_filter($prices, fn ($priceRow) => $priceRow['TITEL_NR'] === $row['TITEL_NR']);
+
+			if (count($priceRows) === 0) {
+				continue;
+			}
+
+			$priceRow = array_values($priceRows)[0];
+
+			$products[$productNumber] = Product::fromCSVRow($row, $priceRow);
 		}
 
 		return new ProductCollection($products);

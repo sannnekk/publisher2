@@ -10,8 +10,8 @@ class Price extends Model
 {
 	public string $productId;
 	public string $currencyId;
-	public int $gross;
-	public int $net;
+	public float $gross;
+	public float $net;
 	public bool $linked = false;
 
 	public static function name(): string|null
@@ -24,17 +24,46 @@ class Price extends Model
 		return md5($this->productId . $this->currencyId);
 	}
 
-	public function __construct(string $productId, float $grossPrice)
+	/**
+	 * Default constructor
+	 * 
+	 * @param string $productId
+	 * @param float $price
+	 * @param string $priceType (values: gross|net)
+	 */
+	public function __construct(string $productId, float $price, string $priceType = 'gross')
 	{
 		$this->productId = $productId;
-		$this->gross = $this->round($grossPrice ?? 0);
-		$this->net = $this->round($grossPrice / (1 + $_ENV['SW_TAX'] / 100));
+		$this->setPrice($price, $priceType);
 
 		// defaults
 		$this->currencyId = $_ENV['SW_CURRENCY_ID'];
 	}
 
-	private function round(float $price): int
+	/**
+	 * Set price
+	 * 
+	 * @param float $price
+	 * @param string $priceType (values: gross|net)
+	 */
+	public function setPrice(float $price, string $priceType = 'gross'): void
+	{
+		if ($priceType === 'gross') {
+			$this->gross = $this->round($price);
+			$this->net = $this->round($price / (1 + $_ENV['TAX_RATE']));
+		} else {
+			$this->net = $this->round($price);
+			$this->gross = $this->round($price * (1 + $_ENV['TAX_RATE']));
+		}
+	}
+
+	/**
+	 * Round price to 2 decimal places
+	 * 
+	 * @param float $price
+	 * @return float
+	 */
+	private function round(float $price): float
 	{
 		return ((int) round($price * 100)) / 100;
 	}

@@ -1,0 +1,18 @@
+[2024-06-18 11:00:24] info: Authenticating with Shopware -
+[2024-06-18 11:00:25] info: Successfully authenticated with Shopware -
+[2024-06-18 11:00:25] info: Parsing file: data/Titeldaten/titel.txt
+[2024-06-18 11:00:25] info: Parsing file: data/Titeldaten/tit_webgrp.txt
+[2024-06-18 11:00:25] info: Parsing file: data/Titeldaten/tit_info.txt
+[2024-06-18 11:00:25] info: Parsing file: data/Titeldaten/tit_preis.txt
+[2024-06-18 11:00:25] info: Parsing file: data/Lagerbestand/tit_bestand_nobis.csv
+[2024-06-18 11:00:25] info: Creating entities from CSV files
+[2024-06-18 11:00:25] info: Filtering out products with 'x' in product number
+[2024-06-18 11:00:25] info: Setting stocks
+[2024-06-18 11:00:25] info: Setting additional prices
+[2024-06-18 11:00:26] info: Setting categories
+[2024-06-18 11:00:26] info: Syncing categories with Shopware
+[2024-06-18 11:00:26] info: Syncing 120 category entities with Shopware -
+[2024-06-18 11:00:27] info: Successfully synced 120 category entities with Shopware, status code 200 -
+[2024-06-18 11:00:27] info: Parsing images
+[2024-06-18 11:00:27] info: Uploading images
+[2024-06-18 11:00:27] info: Uploading 1118 images to Shopware -

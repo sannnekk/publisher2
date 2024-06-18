@@ -49,7 +49,7 @@ $CLI_OPTIONS = [
 			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Sollen auch die Verfügbarkeiten synchronisiert werden?',
-			'alias' => ['a']
+			'alias' => ['s']
 		],
 	],
 	'complete-orders' => [

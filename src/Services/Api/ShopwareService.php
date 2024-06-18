@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace HMnet\Publisher2\Services\Api;
 
 use GuzzleHttp\Client;
+use HMnet\Publisher2\Log\LoggerInterface;
+use HMnet\Publisher2\Log\Logger;
+use HMnet\Publisher2\Model\Product\ProductMedia;
 use HMnet\Publisher2\Model\Model;
 
 class ShopwareService
@@ -20,6 +23,7 @@ class ShopwareService
 	];
 
 	private Client $httpClient;
+	private LoggerInterface $logger;
 
 	public function __construct(string $apiUrl, string $username, string $password)
 	{
@@ -27,9 +31,11 @@ class ShopwareService
 		$this->authData['username'] = $username;
 		$this->authData['password'] = $password;
 
+		$this->logger = new Logger(1);
+
 		$this->httpClient = new Client([
 			'base_uri' => $this->apiUrl,
-			'timeout' => 30,
+			'timeout' => 60,
 		]);
 
 		$this->auth();
@@ -42,13 +48,15 @@ class ShopwareService
 	private function auth(): void
 	{
 		try {
-			$response = $this->httpClient->post('/oauth/token', [
+			$this->logger->info('Authenticating with Shopware');
+			$response = $this->httpClient->post('oauth/token', [
 				'json' => $this->authData,
 			]);
 
 			$this->token = json_decode($response->getBody()->getContents(), true)['access_token'];
+			$this->logger->info('Successfully authenticated with Shopware');
 		} catch (\Exception $e) {
-			throw new \Exception('Shopware auth failed');
+			throw new \Exception('Shopware auth failed', 0, $e);
 		}
 	}
 
@@ -69,8 +77,10 @@ class ShopwareService
 			throw new \Exception('Entity is local only and cannot be synced with Shopware');
 		}
 
+		$this->logger->info('Syncing ' . count($entities) . ' ' . $entityName . ' entities with Shopware');
+
 		try {
-			$response = $this->httpClient->post('/_action/sync', [
+			$response = $this->httpClient->post('_action/sync', [
 				'headers' => [
 					'Authorization' => 'Bearer ' . $this->token,
 				],
@@ -83,14 +93,19 @@ class ShopwareService
 				],
 			]);
 
+
 			$responseCode = $response->getStatusCode();
 			$response = json_decode($response->getBody()->getContents(), true);
 
 			if ($responseCode > 299 || $responseCode < 200) {
-				throw new \Exception('Shopware sync failed');
+				$this->logger->error('Shopware sync failed: bad response code: ' . $responseCode);
+				throw new \Exception('Shopware sync failed: bad response code: ' . $responseCode);
 			}
+
+			$this->logger->info('Successfully synced ' . count($entities) . ' ' . $entityName . ' entities with Shopware, status code ' . $responseCode);
 		} catch (\Exception $e) {
-			throw new \Exception('Shopware sync failed');
+			$this->logger->error('Shopware sync failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			throw new \Exception('Shopware sync failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
 		}
 	}
 
@@ -111,14 +126,18 @@ class ShopwareService
 			throw new \Exception('Entity is local only and cannot be synced with Shopware');
 		}
 
+		$this->logger->info('Removing orphants from ' . $entityName . ' entities in Shopware');
+
 		$idsToDelete = $this->getIdsToDelete(
 			$entityName,
 			array_map(fn ($entity) => $entity->id ?? $entity->id(), $entitiesToKeep),
-			100
+			(int) $_ENV['REMOVE_ORPHANTS_LIMIT'] ?? 100
 		);
 
+		$this->logger->info('Removing ' . count($idsToDelete) . ' orphants from ' . $entityName . ' entities in Shopware');
+
 		try {
-			$response = $this->httpClient->post('/_action/sync', [
+			$response = $this->httpClient->post('_action/sync', [
 				'headers' => [
 					'Authorization' => 'Bearer ' . $this->token,
 				],
@@ -135,10 +154,14 @@ class ShopwareService
 			$response = json_decode($response->getBody()->getContents(), true);
 
 			if ($responseCode > 299 || $responseCode < 200) {
-				throw new \Exception('Shopware sync failed');
+				$this->logger->error('Removal of orphans failed, status code ' . $responseCode);
+				throw new \Exception('Removal of orphans failed');
 			}
+
+			$this->logger->info('Successfully removed ' . count($idsToDelete) . ' orphants from ' . $entityName . ' entities in Shopware, status code ' . $responseCode);
 		} catch (\Exception $e) {
-			throw new \Exception('Shopware sync failed');
+			$this->logger->error('Removal of orphans failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			throw new \Exception('Removal of orphans failed');
 		}
 	}
 
@@ -169,6 +192,14 @@ class ShopwareService
 		return $idsToDelete;
 	}
 
+	/**
+	 * Get ids of entities
+	 * 
+	 * @param string $entityName
+	 * @param int $limit
+	 * @param int $page
+	 * @return array<string>
+	 */
 	private function getIds(string $entityName, int $limit, int $page): array
 	{
 		$ids = [];
@@ -177,6 +208,7 @@ class ShopwareService
 			$response = $this->httpClient->get($entityName . '?limit=' . $limit . '&page=' . $page, [
 				'headers' => [
 					'Authorization' => 'Bearer ' . $this->token,
+					'Accept' => 'application/json',
 				],
 			]);
 
@@ -189,6 +221,7 @@ class ShopwareService
 
 			$ids = array_map(fn ($entity) => $entity['id'], $response['data']);
 		} catch (\Exception $e) {
+			throw $e;
 			throw new \Exception('Shopware sync failed');
 		}
 
@@ -198,9 +231,42 @@ class ShopwareService
 	/**
 	 * Upload images to Shopware
 	 * 
-	 * @param array<Image> $images
+	 * @param array<ProductMedia> $images
 	 */
 	public function uploadImages(array $images): void
 	{
+		$this->logger->info('Uploading ' . count($images) . ' images to Shopware');
+		foreach ($images as $image) {
+			$this->uploadImage($image);
+		}
+	}
+
+	/**
+	 * Upload image to Shopware
+	 * 
+	 * @param ProductMedia $image
+	 */
+	private function uploadImage(ProductMedia $image): void
+	{
+		$id = $image->id();
+
+		try {
+			echo 'URL: ' . $image->url() . PHP_EOL;
+			die;
+			$this->httpClient->post(
+				'_action/media/' . $id . '/upload',
+				[
+					'headers' => [
+						'Authorization' => 'Bearer ' . $this->token,
+					],
+					'json' => [
+						'url' => $image->url(),
+					],
+				]
+			);
+		} catch (\Exception $e) {
+			$this->logger->error('Image upload failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			return;
+		}
 	}
 }

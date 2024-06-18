@@ -1,13 +1,18 @@
-<?php declare(strict_types=1);
+<?php
 
-namespace HMnet\Publisher2\Util;
+declare(strict_types=1);
 
+namespace HMnet\Publisher2\Model\Collection;
+
+use HMnet\Publisher2\Model\Collection\EntityCollection;
 use HMnet\Publisher2\Model\Product\Product;
+use HMnet\Publisher2\Model\Local\Stock;
 
 /**
  * @extends \ArrayObject<string, Product>
  */
-class ProductCollection extends \ArrayObject {
+class ProductCollection extends EntityCollection
+{
 	/**
 	 * Default constructor
 	 * 
@@ -23,7 +28,8 @@ class ProductCollection extends \ArrayObject {
 	 * will be synced, but the categories of them wont be synced
 	 * 
 	 */
-	public function dontSyncXProductCategories() {
+	public function dontSyncXProductCategories()
+	{
 		foreach ($this as &$product) {
 			if ($product->isXProduct()) {
 				$product->dontSyncCategories();
@@ -36,7 +42,8 @@ class ProductCollection extends \ArrayObject {
 	 * 
 	 * @param array<string, Stock> $stocks
 	 */
-	public function addStocks(array $stocks): void {
+	public function addStocks(array $stocks): void
+	{
 		foreach ($this as $productNumber => &$product) {
 			$stock = $stocks[$productNumber] ?? null;
 
@@ -46,7 +53,7 @@ class ProductCollection extends \ArrayObject {
 				continue;
 			}
 
-			$product->stock = $stock->setStockFromMerkzettel();
+			$product->stock = $stock->getStockFromMerkzettel();
 			$product->active = $stock->getIsActiveFromMerkzettel();
 		}
 	}
@@ -56,10 +63,11 @@ class ProductCollection extends \ArrayObject {
 	 * 
 	 * @param array<string, AdditionalPrice>> $additionalPrices
 	 */
-	public function addAdditionalPrices(array $additionalPrices): void {
+	public function addAdditionalPrices(array $additionalPrices): void
+	{
 		foreach ($this as $productNumber => &$product) {
 			[$firmAdditionalPrice, $bigFirmAdditionalPrice] = $additionalPrices[$productNumber] ?? [null, null];
-			
+
 			if ($firmAdditionalPrice) {
 				$product->addAdditionalPrice($firmAdditionalPrice);
 			}
@@ -75,12 +83,35 @@ class ProductCollection extends \ArrayObject {
 	 * 
 	 * @param array<string, array<string, Category>> $categories
 	 */
-	public function addCategories(array $categories): void {
+	public function addCategories(CategoryCollection $categories): void
+	{
 		foreach ($this as $productNumber => &$product) {
 			$categories = $categories[$productNumber] ?? [];
-			$leafCategoryIds = array_map(fn($category) => $category->getLeafCategoryIds(), $categories);
-			
+
+			$leafCategoryIds = array_map(fn ($category) => $category->getLeafIds(), $categories);
+
+			// Flatten the array
+			$leafCategoryIds = array_reduce($leafCategoryIds, 'array_merge', []);
+
 			$product->addCategoryIds($leafCategoryIds);
+		}
+	}
+
+	/**
+	 * Add images to the products
+	 * 
+	 * @param array<string, ProductMedia> $images
+	 */
+	public function addImages(array $images): void
+	{
+		foreach ($this as $productNumber => &$product) {
+			$image = $images[$productNumber] ?? null;
+
+			if (!$image) {
+				continue;
+			}
+
+			$product->addMedia($image);
 		}
 	}
 
@@ -89,7 +120,8 @@ class ProductCollection extends \ArrayObject {
 	 * 
 	 * @return array<Product>
 	 */
-	public function toArray(): array {
-		return array_values($this->getArrayCopy());
+	public function toArray(): array
+	{
+		return array_values(parent::getArrayCopy());
 	}
 }

@@ -1,19 +1,29 @@
-<?php declare (strict_types = 1);
+<?php
+
+declare(strict_types=1);
 
 namespace HMnet\Publisher2\Model\Product;
 
 use HMnet\Publisher2\Model\Model;
 
-class Visibility extends Model {
+class Visibility extends Model
+{
 	public string $productId;
 	public string $salesChannelId;
 	public int $visibility = 30;
 
-	public function id(): string {
+	public function id(): string
+	{
 		return md5($this->productId);
 	}
 
-	public function __construct(string $productId) {
+	public static function name(): string
+	{
+		return 'product-visibility';
+	}
+
+	public function __construct(string $productId)
+	{
 		$this->productId = $productId;
 
 		// defaults

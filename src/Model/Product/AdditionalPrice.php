@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace HMnet\Publisher2\Model\Product;
 
 use HMnet\Publisher2\Model\Model;
-use HMnet\Publisher2\Util\ProductCollection;
+use HMnet\Publisher2\Model\Collection\ProductCollection;
 
 class AdditionalPrice extends Model
 {
@@ -16,7 +16,7 @@ class AdditionalPrice extends Model
 
 	public function id(): string
 	{
-		return md5($this->productId . $this->price->id());
+		return md5($this->productId . $this->ruleId);
 	}
 
 	public static function name(): string
@@ -55,7 +55,7 @@ class AdditionalPrice extends Model
 			'productId' => $this->productId,
 			'quantityStart' => $this->quantityStart,
 			'ruleId' => $this->ruleId,
-			'price' => $this->price->serialize(),
+			'price' => [$this->price->serialize()],
 		];
 	}
 
@@ -64,24 +64,32 @@ class AdditionalPrice extends Model
 	 * @param array<array<string>> $csv
 	 * @return array<string, array<AdditionalPrice>>
 	 */
-	public static function fromCSV(ProductCollection $products, array $csv): array
+	public static function fromCSV(ProductCollection $products, array $bigFirmCsv, array $firmCsv): array
 	{
 		$additionalPrices = [];
 
-		foreach ($csv as $row) {
-			$productNumber = Product::productNumberFromCSV($row);
+		foreach ($bigFirmCsv as $bigFirmRow) {
+			$productNumber = Product::productNumberFromCSV($bigFirmRow);
 			$product = $products[$productNumber];
+
+			$firmRow = array_filter($firmCsv, fn ($r) => Product::productNumberFromCSV($r) === $productNumber);
+
+			if (count($firmRow) === 0) {
+				continue;
+			}
+
+			$firmRow = array_values($firmRow)[0];
 
 			if (!$product) {
 				continue;
 			}
 
-			$firmPrice = new Price($product->id, (float)$row['price']);
-			$bigFirmPrice = new Price($product->id, (float)$row['bigFirmPrice']);
+			$firmPrice = new Price($product->id(), (float)$firmRow['PREIS1'], 'net');
+			$bigFirmPrice = new Price($product->id(), (float)$bigFirmRow['PREIS1'], 'net');
 
 			$additionalPrices[$productNumber] = [
-				new AdditionalPrice($product->id, $firmPrice, 'firm'),
-				new AdditionalPrice($product->id, $bigFirmPrice, 'big-firm'),
+				new AdditionalPrice($product->id(), $firmPrice, 'firm'),
+				new AdditionalPrice($product->id(), $bigFirmPrice, 'big-firm'),
 			];
 		}
 
