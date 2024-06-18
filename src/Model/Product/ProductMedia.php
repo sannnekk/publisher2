@@ -33,6 +33,11 @@ class ProductMedia extends Model
 		return 'https://' . $_ENV['LOCATION'] . '/' . $this->path;
 	}
 
+	public function extension(): string
+	{
+		return pathinfo($this->path, PATHINFO_EXTENSION);
+	}
+
 	public function __construct(string $productNumber, string $path)
 	{
 		$this->productNumber = $productNumber;
@@ -85,7 +90,10 @@ class ProductMedia extends Model
 		return [
 			'id' => $this->id(),
 			'productId' => $this->productId,
-			'mediaId' => $this->id()
+			'mediaId' => $this->id(),
+			'media' => [
+				'id' => $this->id()
+			]
 		];
 	}
 }

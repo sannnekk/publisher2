@@ -94,21 +94,25 @@ class ProductSyncController extends Controller
 			$this->shopwareService->syncEntities($categories->toArray());
 		}
 
-		// 7. Prepare and upload images if option is set
+		// 7. Prepare images if option is set
 		if ($this->options['with-images']) {
 			$this->logger->info("Parsing images");
 			$images = ProductMedia::fromFolder($_ENV['IMAGES_FOLDER']);
 			$products->addImages($images);
 
-			$this->logger->info("Uploading images");
-			$this->shopwareService->uploadImages($images);
+			// upload the images after the products are synced
 		}
 
 		// 8. Sync products
 		$this->logger->info("Syncing products with Shopware");
 		$this->shopwareService->syncEntities($products->toArray());
 
-		// 9. Remove orphans if option is set
+		if ($this->options['with-images']) {
+			$this->logger->info("Uploading images to Shopware");
+			$this->shopwareService->uploadImages($images);
+		}
+
+		// 10. Remove orphans if option is set
 		if ($this->options['remove-orphans']) {
 			$this->logger->info("Removing orphans");
 			$this->shopwareService->removeOrphants($products->toArray());

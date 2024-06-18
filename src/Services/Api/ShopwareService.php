@@ -9,6 +9,7 @@ use HMnet\Publisher2\Log\LoggerInterface;
 use HMnet\Publisher2\Log\Logger;
 use HMnet\Publisher2\Model\Product\ProductMedia;
 use HMnet\Publisher2\Model\Model;
+use GuzzleHttp\Exception\ClientException;
 
 class ShopwareService
 {
@@ -82,20 +83,20 @@ class ShopwareService
 		try {
 			$response = $this->httpClient->post('_action/sync', [
 				'headers' => [
-					'Authorization' => 'Bearer ' . $this->token,
+					'Authorization' => 'Bearer ' . $this->token
 				],
 				'json' => [
 					[
 						'entity' => $entityName,
 						'action' => 'upsert',
-						'payload' => array_map(fn ($entity) => $entity->serialize(), $entities),
+						'payload' => self::utf8ize(array_map(fn ($entity) => $entity->serialize(), $entities)),
 					]
 				],
 			]);
 
 
 			$responseCode = $response->getStatusCode();
-			$response = json_decode($response->getBody()->getContents(), true);
+			//$response = json_decode($response->getBody()->getContents(), true);
 
 			if ($responseCode > 299 || $responseCode < 200) {
 				$this->logger->error('Shopware sync failed: bad response code: ' . $responseCode);
@@ -103,6 +104,10 @@ class ShopwareService
 			}
 
 			$this->logger->info('Successfully synced ' . count($entities) . ' ' . $entityName . ' entities with Shopware, status code ' . $responseCode);
+		} catch (ClientException $e) { // 4xx error
+			$response = $e->getResponse();
+			$this->logger->error('Shopware sync failed on SW, response: ' . $response->getBody()->getContents());
+			throw new \Exception('Shopware sync failed on SW, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
 		} catch (\Exception $e) {
 			$this->logger->error('Shopware sync failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
 			throw new \Exception('Shopware sync failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
@@ -133,6 +138,11 @@ class ShopwareService
 			array_map(fn ($entity) => $entity->id ?? $entity->id(), $entitiesToKeep),
 			(int) $_ENV['REMOVE_ORPHANTS_LIMIT'] ?? 100
 		);
+
+		if (count($idsToDelete) === 0) {
+			$this->logger->info('No orphants to remove from ' . $entityName . ' entities in Shopware');
+			return;
+		}
 
 		$this->logger->info('Removing ' . count($idsToDelete) . ' orphants from ' . $entityName . ' entities in Shopware');
 
@@ -221,7 +231,6 @@ class ShopwareService
 
 			$ids = array_map(fn ($entity) => $entity['id'], $response['data']);
 		} catch (\Exception $e) {
-			throw $e;
 			throw new \Exception('Shopware sync failed');
 		}
 
@@ -235,10 +244,15 @@ class ShopwareService
 	 */
 	public function uploadImages(array $images): void
 	{
+		$uploadedCount = 0;
 		$this->logger->info('Uploading ' . count($images) . ' images to Shopware');
+
 		foreach ($images as $image) {
-			$this->uploadImage($image);
+			$uploadedCount = $this->uploadImage($image) ? $uploadedCount + 1 : $uploadedCount;
 		}
+
+		$this->logger->info('Successfully uploaded ' . $uploadedCount . ' images to Shopware');
+		$this->logger->warning('Failed to upload ' . (count($images) - $uploadedCount) . ' images to Shopware');
 	}
 
 	/**
@@ -246,27 +260,51 @@ class ShopwareService
 	 * 
 	 * @param ProductMedia $image
 	 */
-	private function uploadImage(ProductMedia $image): void
+	private function uploadImage(ProductMedia $image): bool
 	{
 		$id = $image->id();
+		$extension = $image->extension();
 
 		try {
-			echo 'URL: ' . $image->url() . PHP_EOL;
-			die;
 			$this->httpClient->post(
-				'_action/media/' . $id . '/upload',
+				'_action/media/' . $id . '/upload?extension=' . $extension,
 				[
 					'headers' => [
 						'Authorization' => 'Bearer ' . $this->token,
+						'extension' => $extension,
+						'Content-Type' => 'application/json',
+						'Accept' => 'application/json',
 					],
 					'json' => [
 						'url' => $image->url(),
 					],
 				]
 			);
+
+			return true;
 		} catch (\Exception $e) {
-			$this->logger->error('Image upload failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
-			return;
+			//$this->logger->error('Image upload failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			return false;
 		}
+	}
+
+	/**
+	 * Convert multi-dimensional array to UTF-8
+	 * 
+	 * @param array $data
+	 * @return array
+	 */
+	private static function utf8ize($data)
+	{
+		if (is_array($data)) {
+
+			foreach ($data as $key => $value) {
+				$data[$key] = self::utf8ize($value);
+			}
+		} elseif (is_string($data)) {
+			return mb_convert_encoding($data, "UTF-8", "UTF-8");
+		}
+
+		return $data;
 	}
 }

@@ -34,6 +34,11 @@ class CsvParsingService
 	public function parse(string $file): array
 	{
 		$handle = fopen($file, 'r');
+
+		if ($handle === false) {
+			throw new \RuntimeException("Could not open file: $file");
+		}
+
 		$headers = fgetcsv($handle, 0, $this->delimiter, $this->enclosure, $this->escape);
 		$data = [];
 
