@@ -43,6 +43,13 @@ class Product extends Model
 	private array $visibilities = [];
 
 	/**
+	 * @var array<string, mixed>
+	 */
+	private array $customFields = [
+		'custom_x_score_sort' => 0,
+	];
+
+	/**
 	 * @var array<ProductMedia>
 	 */
 	private array $media = [];
@@ -104,6 +111,11 @@ class Product extends Model
 		$this->dontSyncCategories = true;
 	}
 
+	public function sortOut(): void
+	{
+		$this->customFields['custom_x_score_sort'] = 999;
+	}
+
 	public function addSearchKeyword(string $keyword): void
 	{
 		$this->customSearchKeywords[] = $keyword;
@@ -146,6 +158,7 @@ class Product extends Model
 			'customSearchKeywords' => $this->customSearchKeywords,
 			'cmsPageId' => $this->cmsPageId,
 			'taxId' => $this->taxId,
+			'customFields' => $this->customFields,
 			// !IMPORTANT: 
 			// manufacturerNumber is the field that is used to tell minPurchase and purchaseSteps for companies
 			// as Shopware doesnt allow to have different minPurchase and purchaseSteps for different customer groups.
@@ -170,15 +183,25 @@ class Product extends Model
 		return $serialized;
 	}
 
+	/**
+	 * Get manufacturer number
+	 */
 	private function getManufacturerNumber(): string
 	{
 		return $this->minPurchase . '|' . $this->purchaseSteps;
 	}
 
+	/**
+	 * Create a Product from CSV row
+	 * 
+	 * @param array<string> $csv
+	 * @param array<string> $priceRow
+	 * @return Product
+	 */
 	public static function fromCSVRow(array $csv, array $priceRow): Product
 	{
 		$product = new Product(self::productNumberFromCSV($csv));
-		$product->name = $csv['BEZEICHNUNG1'];
+		$product->name = self::nameFromCSV($csv['BEZEICHNUNG1']);
 		$product->weight = (float) $csv['GEWICHT_GR'];
 		$product->width = (float) $csv['LAENGE_MM'];
 		$product->height = (float) $csv['BREITE_MM'];
@@ -194,6 +217,32 @@ class Product extends Model
 		return $product;
 	}
 
+	/**
+	 * Get name from CSV row
+	 * 
+	 * @param string $name
+	 * @return string
+	 */
+	private static function nameFromCSV(string $name): string
+	{
+		if (str_starts_with($name, 'PK')) {
+			return 'Postkarte' . substr($name, 2);
+		}
+
+		if (str_starts_with($name, 'DK')) {
+			return 'Klappkarte' . substr($name, 2);
+		}
+
+		return $name;
+	}
+
+	/**
+	 * Create a ProductCollection from CSV and prices
+	 * 
+	 * @param array<array<string>> $csv
+	 * @param array<array<string>> $prices
+	 * @return ProductCollection
+	 */
 	public static function fromCSV(array $csv, array $prices): ProductCollection
 	{
 		$products = [];
@@ -214,6 +263,12 @@ class Product extends Model
 		return new ProductCollection($products);
 	}
 
+	/**
+	 * Get product number from CSV row
+	 * 
+	 * @param array<string> $csv
+	 * @return string
+	 */
 	public static function productNumberFromCSV($csv): string
 	{
 		return $_ENV['PRODUCT_NUMBER_PREFIX'] . $csv['TITEL_NR'];

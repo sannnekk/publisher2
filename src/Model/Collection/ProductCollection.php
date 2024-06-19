@@ -38,6 +38,19 @@ class ProductCollection extends EntityCollection
 	}
 
 	/**
+	 * If executed, the products containing 'x' in product number
+	 * will be sorted to the end
+	 */
+	public function sortXProductsOut()
+	{
+		foreach ($this as $product) {
+			if ($product->isXProduct()) {
+				$product->sortOut();
+			}
+		}
+	}
+
+	/**
 	 * Add stocks to the products
 	 * 
 	 * @param array<string, Stock> $stocks

@@ -9,3 +9,4 @@ Works only from server! It means, the root folder should be available through th
 - Curl
 - PHP 8.1 or higher
 - Shopware 6.5 or newer
+- linux (doesnt work on windows because of iconv)

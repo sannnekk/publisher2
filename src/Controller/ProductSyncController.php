@@ -67,7 +67,7 @@ class ProductSyncController extends Controller
 		// 3. Filter out products with 'x' in product number if option is set
 		if ($this->options['sort-x-out']) {
 			$this->logger->info("Filtering out products with 'x' in product number");
-			$products->dontSyncXProductCategories();
+			$products->sortXProductsOut();
 		}
 
 		// 4. Set stocks if option is set
