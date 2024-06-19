@@ -48,12 +48,14 @@ class Price extends Model
 	 */
 	public function setPrice(float $price, string $priceType = 'gross'): void
 	{
+		$tax = 1 + ((float)$_ENV['TAX_RATE'] / 100);
+
 		if ($priceType === 'gross') {
 			$this->gross = $this->round($price);
-			$this->net = $this->round($price / (1 + $_ENV['TAX_RATE']));
+			$this->net = $this->round($price / $tax);
 		} else {
 			$this->net = $this->round($price);
-			$this->gross = $this->round($price * (1 + $_ENV['TAX_RATE']));
+			$this->gross = $this->round($price * $tax);
 		}
 	}
 
@@ -65,7 +67,7 @@ class Price extends Model
 	 */
 	private function round(float $price): float
 	{
-		return ((int) round($price * 100)) / 100;
+		return round($price * 100) / 100;
 	}
 
 	public function serialize(): array
