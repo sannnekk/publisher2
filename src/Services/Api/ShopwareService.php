@@ -260,7 +260,7 @@ class ShopwareService
 		$entityName = $entityClass::name();
 
 		try {
-			$response = $this->httpClient->get('search/' . $entityName, [
+			$response = $this->httpClient->post('search/' . $entityName, [
 				'headers' => [
 					'Authorization' => 'Bearer ' . $this->token,
 					'Accept' => 'application/json',
@@ -275,7 +275,7 @@ class ShopwareService
 				throw new \Exception('Failed to get entities from Shopware, response code: ' . $responseCode);
 			}
 
-			$entities = array_map(fn ($entity) => $entity::fromSWResponse($entity), $response['data']);
+			$entities = array_map(fn ($entity) => $entityClass::fromSWResponse($entity), $response['data']);
 		} catch (\Exception $e) {
 			throw new \Exception('Failed to get entities from Shopware, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
 		}
@@ -292,7 +292,7 @@ class ShopwareService
 	public function setOrderStatus(string $orderId, string $status): void
 	{
 		try {
-			$response = $this->httpClient->post("_action/order/$orderId/state/$status" . $orderId, [
+			$response = $this->httpClient->post("_action/order/$orderId/state/$status", [
 				'headers' => [
 					'Authorization' => 'Bearer ' . $this->token
 				]

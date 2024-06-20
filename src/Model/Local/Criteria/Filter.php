@@ -40,11 +40,26 @@ class Filter
 		];
 
 		if ($this->parameters) {
-			$serialized['parameters'] = $this->parameters;
+			$serialized['parameters'] = $this->serializedParameters();
 		}
 
 		if ($this->value) {
 			$serialized['value'] = $this->value;
+		}
+
+		return $serialized;
+	}
+
+	private function serializedParameters(): array
+	{
+		$serialized = [];
+
+		foreach ($this->parameters as $key => $value) {
+			if ($value instanceof \DateTime || $value instanceof \DateTimeImmutable) {
+				$value = $value->format($_ENV['DATE_FORMAT']) . "T22:00:00.000Z";
+			}
+
+			$serialized[$key] = $value;
 		}
 
 		return $serialized;

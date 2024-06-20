@@ -4,7 +4,7 @@ $CLI_OPTIONS = [
 	'help' => [],
 	'sync-products' => [
 		'remove-orphans' => [
-			'type' => 'number',
+			'type' => 'boolean',
 			'default' => false,
 			'description' => 'Sollen auch Produkte gelöscht werden, die nicht mehr in der Quelle existieren?',
 			'alias' => ['r']
@@ -42,7 +42,7 @@ $CLI_OPTIONS = [
 	],
 	'complete-orders' => [
 		'limit' => [
-			'type' => 'number',
+			'type' => 'int',
 			'default' => 300,
 			'description' => 'Anzahl der Bestellungen, die abgeschlossen werden',
 			'alias' => ['l']

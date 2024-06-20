@@ -33,12 +33,16 @@ class CompleteOrdersController extends Controller
 	{
 		$statistics = new Statistics();
 
+		if (!isset($options['limit'])) {
+			throw new \InvalidArgumentException('Limit is required');
+		}
+
 		// 1. Get all incomplete orders from last 24h from SW
 		$this->logger->info('Getting incomplete orders from last 24h from SW');
-		$criteria = new Criteria(1, 100);
+		$criteria = new Criteria(1, $options['limit']);
 
 		$dateFilter = new Filter('range', 'orderDateTime', null, [
-			'gte' => (new \DateTime())->sub(new \DateInterval('P1D')),
+			'gte' => (new \DateTime())->modify('-2 days'),
 		]);
 		$idFilter = new Filter('equalsAny', 'stateMachineState.id', $_ENV['SW_ORDER_COMPLETE_STATE_ID']);
 
@@ -56,9 +60,9 @@ class CompleteOrdersController extends Controller
 
 		$this->logger->info('Found ' . count($orders) . ' incomplete orders from last 24h from SW');
 
-		if (count($orders) > $options['limit'] ?? 300) {
+		if (count($orders) > $options['limit']) {
 			$this->logger->info('Limit reached, stopping');
-			$this->logger->info('Limit: ' . ($options['limit'] ?? 300) . ', found: ' . count($orders));
+			$this->logger->info('Limit: ' . ($options['limit']) . ', found: ' . count($orders));
 			return $statistics;
 		}
 

@@ -1,29 +1,36 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace HMnet\Publisher2;
 
-class CLI {
+class CLI
+{
 	private array $availableActions;
 
 	private string $action;
 
 	private array $parsedArgs = [];
 
-	public function __construct($options, $args) {
+	public function __construct($options, $args)
+	{
 		$this->availableActions = $options;
 		$this->parseAction($args);
 		$this->parseArgs($args);
 	}
 
-	public function getAction(): string {
+	public function getAction(): string
+	{
 		return $this->action;
 	}
 
-	public function getArgs(): array {
+	public function getArgs(): array
+	{
 		return $this->parsedArgs;
 	}
 
-	private function parseAction($args): void {
+	private function parseAction($args): void
+	{
 		$action = $args[1] ?? 'help';
 
 		if (!array_key_exists($action, $this->availableActions) || $action === 'help') {
@@ -33,9 +40,10 @@ class CLI {
 		$this->action = $action;
 	}
 
-	private function parseArgs($args): void {
+	private function parseArgs($args): void
+	{
 		$options = $this->availableActions[$this->action] ?? [];
-		
+
 		foreach ($options as $optionName => $option) {
 			$optionAliases = $option['alias'];
 			$optionValue = $option['default'];
@@ -43,42 +51,47 @@ class CLI {
 
 			foreach ($args as $arg) {
 				if (strpos($arg, '--' . $optionName) === 0) {
-					$optionValue = $this->parseOptionValue('--' . $optionName, $optionType, $arg);
+					$optionValue = $this->parseOptionValue('--' . $optionName, $optionType, $args);
 				}
 
 				foreach ($optionAliases as $alias) {
 					if (strpos($arg, '-' . $alias) === 0) {
-						$optionValue = $this->parseOptionValue('-' . $alias, $optionType, $arg);
+						$optionValue = $this->parseOptionValue('-' . $alias, $optionType, $args);
 					}
 				}
 			}
 
 			$this->parsedArgs[$optionName] = $optionValue;
-		
 		}
 	}
 
-	private function parseOptionValue(string $option, string $type, string $arg): mixed {
-		$argParts = explode('=', $arg);
+	private function parseOptionValue(string $optionName, string $type, array $args): mixed
+	{
+		$optionIndex = array_search($optionName, $args);
 
-		if (count($argParts) !== 2) {
-			return true;
-		}
-
-		$value = $argParts[1];
-
-		if ($type === 'number') {
-			return (int) $value;
+		if ($optionIndex === false) {
+			return null;
 		}
 
 		if ($type === 'boolean') {
-			return $value === 'true';
+			return true;
+		}
+
+		$value = $args[$optionIndex + 1] ?? null;
+
+		if ($value === null) {
+			return null;
+		}
+
+		if ($type === 'int') {
+			return (int) $value;
 		}
 
 		return $value;
 	}
 
-	private function dieWithHelp(): void {
+	private function dieWithHelp(): void
+	{
 		echo "Usage: php script.php <action> [options]\n";
 		echo "Available actions:\n\n";
 
@@ -93,7 +106,8 @@ class CLI {
 		die();
 	}
 
-	private function echoAction(string $action, array $options): void {
+	private function echoAction(string $action, array $options): void
+	{
 		echo "  $action\n";
 
 		foreach ($options as $option => $config) {
