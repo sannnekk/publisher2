@@ -11,6 +11,9 @@ use HMnet\Publisher2\CoreController;
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
+define('COMMAND', implode(' ', $argv));
+date_default_timezone_set('Europe/Berlin');
+
 $cli = new CLI($CLI_OPTIONS, $argv);
 
 $action = $cli->getAction();

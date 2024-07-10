@@ -31,6 +31,7 @@ class CoreController
 			throw new \Exception('Controller not found');
 		}
 
+		$this->logger->info('Command: ' . COMMAND);
 		$this->logger->info('Running action: ' . $action);
 		$this->logger->info('Args: ' . json_encode($args));
 

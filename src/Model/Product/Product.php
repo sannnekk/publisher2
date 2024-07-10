@@ -207,6 +207,8 @@ class Product extends Model
 		$product->height = (float) $csv['BREITE_MM'];
 		$product->ean = $csv['EAN_NR'];
 		$product->releaseDate = new \DateTime($csv['ERSCHEINUNG']);
+		$product->minPurchase = (int) $csv['VERPACK_EINHEIT'];
+		$product->purchaseSteps = (int) $csv['VERPACK_EINHEIT'];
 
 		$product->setVisibility();
 		$product->setPrice((float) $priceRow['WERT1']);

@@ -68,28 +68,18 @@ class AdditionalPrice extends Model
 	{
 		$additionalPrices = [];
 
-		foreach ($bigFirmCsv as $bigFirmRow) {
-			$productNumber = Product::productNumberFromCSV($bigFirmRow);
+		foreach ($firmCsv as $firmRow) {
+			$productNumber = Product::productNumberFromCSV($firmRow);
 			$product = $products[$productNumber];
-
-			$firmRow = array_filter($firmCsv, fn ($r) => Product::productNumberFromCSV($r) === $productNumber);
-
-			if (count($firmRow) === 0) {
-				continue;
-			}
-
-			$firmRow = array_values($firmRow)[0];
 
 			if (!$product) {
 				continue;
 			}
 
 			$firmPrice = new Price($product->id(), (float)$firmRow['PREIS1'], 'net');
-			$bigFirmPrice = new Price($product->id(), (float)$bigFirmRow['PREIS1'], 'net');
 
 			$additionalPrices[$productNumber] = [
-				new AdditionalPrice($product->id(), $firmPrice, 'firm'),
-				new AdditionalPrice($product->id(), $bigFirmPrice, 'big-firm'),
+				new AdditionalPrice($product->id(), $firmPrice, 'firm')
 			];
 		}
 

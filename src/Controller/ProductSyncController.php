@@ -36,7 +36,8 @@ class ProductSyncController extends Controller
 		$this->shopwareService = new ShopwareService(
 			$_ENV['SW_API_URL'],
 			$_ENV['SW_ADMIN_USER'],
-			$_ENV['SW_ADMIN_PASSWORD']
+			$_ENV['SW_ADMIN_PASSWORD'],
+			intval($_ENV['DEBUG_MODE'])
 		);
 	}
 

@@ -24,11 +24,14 @@ class ShopwareService
 		"password" => null,
 	];
 
+	private int $debugMode = 0;
+
 	private Client $httpClient;
 	private LoggerInterface $logger;
 
-	public function __construct(string $apiUrl, string $username, string $password)
+	public function __construct(string $apiUrl, string $username, string $password, int $debug = 0)
 	{
+		$this->debugMode = $debug;
 		$this->apiUrl = $apiUrl;
 		$this->authData['username'] = $username;
 		$this->authData['password'] = $password;
@@ -82,6 +85,12 @@ class ShopwareService
 		$this->logger->info('Syncing ' . count($entities) . ' ' . $entityName . ' entities with Shopware');
 
 		try {
+			$payload = array_map(fn ($entity) => $entity->serialize(), $entities);
+
+			if ($this->debugMode > 0) {
+				$this->logger->debug($entityName, $payload);
+			}
+
 			$response = $this->httpClient->post('_action/sync', [
 				'headers' => [
 					'Authorization' => 'Bearer ' . $this->token
@@ -90,11 +99,10 @@ class ShopwareService
 					[
 						'entity' => $entityName,
 						'action' => 'upsert',
-						'payload' => array_map(fn ($entity) => $entity->serialize(), $entities),
+						'payload' => $payload,
 					]
 				],
 			]);
-
 
 			$responseCode = $response->getStatusCode();
 			//$response = json_decode($response->getBody()->getContents(), true);

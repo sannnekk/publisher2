@@ -10,6 +10,7 @@ use DateTimeImmutable;
 class Logger implements LoggerInterface
 {
 	private string $logFile;
+	private string $debugFile;
 	private int $nestingLevel;
 	private static ?DateTimeImmutable $sriptStartTime = null;
 
@@ -20,6 +21,7 @@ class Logger implements LoggerInterface
 		}
 
 		$this->logFile = 'logs/' . self::$sriptStartTime->format('Y-m-d_H_i_s') . '.log';
+		$this->debugFile = 'logs/debug_' . self::$sriptStartTime->format('Y-m-d_H_i_s') . '.log';
 		$this->nestingLevel = $nestingLevel;
 
 		if (!file_exists('logs')) {
@@ -40,6 +42,12 @@ class Logger implements LoggerInterface
 	public function warning(string $message): void
 	{
 		file_put_contents($this->logFile, $this->message('warning', $message), FILE_APPEND);
+	}
+
+	public function debug(string $title, mixed $obj): void
+	{
+		$content = $title . PHP_EOL . PHP_EOL . print_r($obj, true) . PHP_EOL;
+		file_put_contents($this->debugFile, $content, FILE_APPEND);
 	}
 
 	private function message(string $level, string $message): string

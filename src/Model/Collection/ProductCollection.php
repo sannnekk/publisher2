@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace HMnet\Publisher2\Model\Collection;
 
+use HMnet\Publisher2\Log\Logger;
+use HMnet\Publisher2\Log\LoggerInterface;
 use HMnet\Publisher2\Model\Collection\EntityCollection;
 use HMnet\Publisher2\Model\Product\Product;
 use HMnet\Publisher2\Model\Local\Stock;
@@ -13,6 +15,8 @@ use HMnet\Publisher2\Model\Local\Stock;
  */
 class ProductCollection extends EntityCollection
 {
+	private readonly LoggerInterface $logger;
+
 	/**
 	 * Default constructor
 	 * 
@@ -21,6 +25,8 @@ class ProductCollection extends EntityCollection
 	public function __construct(array $products = [])
 	{
 		parent::__construct($products);
+
+		$this->logger = new Logger(1);
 	}
 
 	/**
@@ -43,11 +49,16 @@ class ProductCollection extends EntityCollection
 	 */
 	public function sortXProductsOut()
 	{
+		$counter = 0;
+
 		foreach ($this as $product) {
 			if ($product->isXProduct()) {
 				$product->sortOut();
+				$counter++;
 			}
 		}
+
+		$this->logger->info("Sorted out $counter x products");
 	}
 
 	/**
@@ -78,17 +89,18 @@ class ProductCollection extends EntityCollection
 	 */
 	public function addAdditionalPrices(array $additionalPrices): void
 	{
+		$counter = 0;
+
 		foreach ($this as $productNumber => &$product) {
-			[$firmAdditionalPrice, $bigFirmAdditionalPrice] = $additionalPrices[$productNumber] ?? [null, null];
+			[$firmAdditionalPrice] = $additionalPrices[$productNumber] ?? [null, null];
 
 			if ($firmAdditionalPrice) {
 				$product->addAdditionalPrice($firmAdditionalPrice);
-			}
-
-			if ($bigFirmAdditionalPrice) {
-				$product->addAdditionalPrice($bigFirmAdditionalPrice);
+				$counter++;
 			}
 		}
+
+		$this->logger->info("Added $counter additional prices to the products");
 	}
 
 	/**
@@ -98,16 +110,27 @@ class ProductCollection extends EntityCollection
 	 */
 	public function addCategories(CategoryCollection $categories): void
 	{
-		foreach ($this as $productNumber => &$product) {
-			$categories = $categories[$productNumber] ?? [];
+		$counter = 0;
+		$productsWithNoCategories = [];
 
-			$leafCategoryIds = array_map(fn ($category) => $category->getLeafIds(), $categories);
+		foreach ($this as $productNumber => &$product) {
+			$productCategories = $categories[$productNumber] ?? [];
+
+			$leafCategoryIds = array_map(fn ($category) => $category->getLeafIds(), $productCategories);
 
 			// Flatten the array
 			$leafCategoryIds = array_reduce($leafCategoryIds, 'array_merge', []);
 
+			if (count($productCategories) < 1) {
+				$productsWithNoCategories[] = $productNumber;
+			}
+
 			$product->addCategoryIds($leafCategoryIds);
+			$counter++;
 		}
+
+		$this->logger->info("Added to $counter products the categories");
+		$this->logger->info("Products with no categories: " . implode(", ", $productsWithNoCategories));
 	}
 
 	/**

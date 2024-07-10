@@ -55,8 +55,8 @@ class Category extends Model
 	{
 		$leafIds = [];
 
-		foreach ($this->children as $child) {
-			if (empty($child->children)) {
+		foreach ($this->getChildren() as $child) {
+			if (empty($child->getChildren())) {
 				$leafIds[] = $child->id;
 			} else {
 				$leafIds = array_merge($leafIds, $child->getLeafIds($level + 1));
