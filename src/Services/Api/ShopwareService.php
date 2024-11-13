@@ -124,6 +124,64 @@ class ShopwareService
 	}
 
 	/**
+	 * Delete relations from Shopware
+	 * 
+	 * @param array<Relation> $relations
+	 */
+	public function deleteRelations(array $relations): void
+	{
+		if (count($relations) === 0) {
+			return;
+		}
+
+		$relationName = $relations[0]::name();
+
+		if ($relationName === null) {
+			throw new \Exception('Relation is local only and cannot be synced with Shopware');
+		}
+
+		$this->logger->info('Deleting ' . count($relations) . ' ' . $relationName . ' relations from Shopware');
+
+		try {
+			$payload = array_map(fn ($entity) => $entity->serialize(), $relations);
+
+			if ($this->debugMode > 0) {
+				$this->logger->debug($relationName, $payload);
+			}
+
+			$response = $this->httpClient->post('_action/sync', [
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->token
+				],
+				'json' => [
+					[
+						'entity' => $relationName,
+						'action' => 'delete',
+						'payload' => $payload,
+					]
+				],
+			]);
+
+			$responseCode = $response->getStatusCode();
+			//$response = json_decode($response->getBody()->getContents(), true);
+
+			if ($responseCode > 299 || $responseCode < 200) {
+				$this->logger->error('Shopware relation deletion failed: bad response code: ' . $responseCode);
+				throw new \Exception('Shopware relation deletion failed: bad response code: ' . $responseCode);
+			}
+
+			$this->logger->info('Successfully deleted ' . count($relations) . ' ' . $relationName . ' relations with Shopware, status code ' . $responseCode);
+		} catch (ClientException $e) { // 4xx error
+			$response = $e->getResponse();
+			$this->logger->error('Shopware relation deletion failed on SW, response: ' . $response->getBody()->getContents());
+			throw new \Exception('Shopware relation deletion failed on SW, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+		} catch (\Exception $e) {
+			$this->logger->error('Shopware relation deletion failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			throw new \Exception('Shopware relation deletion failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+		}
+	}
+
+	/**
 	 * Remove entites that are not in the list of entities to keep
 	 * 
 	 * @param array<Model> $entitiesToKeep

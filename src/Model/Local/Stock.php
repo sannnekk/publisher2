@@ -24,7 +24,7 @@ class Stock
 		$merkzettelToHide = explode('|', $_ENV['MERKZETTEL_TO_HIDE_PRODUCT']);
 
 		foreach ($merkzettelToHide as $merkzettel) {
-			if (str_contains($this->merkzettel, $merkzettel)) {
+			if (str_contains($this->merkzettel, $merkzettel) && $this->stock < 1) {
 				return false;
 			}
 		}

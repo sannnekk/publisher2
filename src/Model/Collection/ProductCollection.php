@@ -104,6 +104,21 @@ class ProductCollection extends EntityCollection
 	}
 
 	/**
+	 * Remove synced categories from the products
+	 */
+	public function removeSyncedCategories(array $syncedCategories): void
+	{
+		$counter = 0;
+
+		foreach ($this as &$product) {
+			$product->removeSyncedCategories($syncedCategories);
+			$counter++;
+		}
+
+		$this->logger->info("Removed synced categories from $counter products");
+	}
+
+	/**
 	 * Add categories to the products
 	 * 
 	 * @param array<string, array<string, Category>> $categories
