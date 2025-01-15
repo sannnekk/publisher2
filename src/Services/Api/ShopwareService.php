@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace HMnet\Publisher2\Services\Api;
 
+use Category;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ServerException;
 use HMnet\Publisher2\Log\LoggerInterface;
 use HMnet\Publisher2\Log\Logger;
+use HMnet\Publisher2\Model\Collection\CategoryCollection;
 use HMnet\Publisher2\Model\Model;
 use HMnet\Publisher2\Model\Local\Criteria\Criteria;
 use HMnet\Publisher2\Model\Product\ProductMedia;
+use HMnet\Publisher2\Model\Search\SearchFilter;
+use HMnet\Publisher2\Model\Search\SearchType;
 
 class ShopwareService
 {
@@ -24,7 +29,7 @@ class ShopwareService
 		"password" => null,
 	];
 
-	private int $debugMode = 0;
+	private int $debugMode = 1;
 
 	private Client $httpClient;
 	private LoggerInterface $logger;
@@ -85,7 +90,7 @@ class ShopwareService
 		$this->logger->info('Syncing ' . count($entities) . ' ' . $entityName . ' entities with Shopware');
 
 		try {
-			$payload = array_map(fn ($entity) => $entity->serialize(), $entities);
+			$payload = array_map(fn($entity) => $entity->serialize(), $entities);
 
 			if ($this->debugMode > 0) {
 				$this->logger->debug($entityName, $payload);
@@ -117,67 +122,14 @@ class ShopwareService
 			$response = $e->getResponse();
 			$this->logger->error('Shopware sync failed on SW, response: ' . $response->getBody()->getContents());
 			throw new \Exception('Shopware sync failed on SW, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+		} catch (ServerException $e) {
+			$this->logger->error('Shopware sync failed on server, response: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			$this->logger->error('Request: ' . $e->getRequest()->getBody()->getContents());
+			$this->logger->error('Response: ' . $e->getResponse()->getBody()->getContents());
+			throw new \Exception('Shopware sync failed on server, response: ' . $e->getMessage() . ', code: ' . $e->getCode());
 		} catch (\Exception $e) {
-			$this->logger->error('Shopware sync failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
-			throw new \Exception('Shopware sync failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
-		}
-	}
-
-	/**
-	 * Delete relations from Shopware
-	 * 
-	 * @param array<Relation> $relations
-	 */
-	public function deleteRelations(array $relations): void
-	{
-		if (count($relations) === 0) {
-			return;
-		}
-
-		$relationName = $relations[0]::name();
-
-		if ($relationName === null) {
-			throw new \Exception('Relation is local only and cannot be synced with Shopware');
-		}
-
-		$this->logger->info('Deleting ' . count($relations) . ' ' . $relationName . ' relations from Shopware');
-
-		try {
-			$payload = array_map(fn ($entity) => $entity->serialize(), $relations);
-
-			if ($this->debugMode > 0) {
-				$this->logger->debug($relationName, $payload);
-			}
-
-			$response = $this->httpClient->post('_action/sync', [
-				'headers' => [
-					'Authorization' => 'Bearer ' . $this->token
-				],
-				'json' => [
-					[
-						'entity' => $relationName,
-						'action' => 'delete',
-						'payload' => $payload,
-					]
-				],
-			]);
-
-			$responseCode = $response->getStatusCode();
-			//$response = json_decode($response->getBody()->getContents(), true);
-
-			if ($responseCode > 299 || $responseCode < 200) {
-				$this->logger->error('Shopware relation deletion failed: bad response code: ' . $responseCode);
-				throw new \Exception('Shopware relation deletion failed: bad response code: ' . $responseCode);
-			}
-
-			$this->logger->info('Successfully deleted ' . count($relations) . ' ' . $relationName . ' relations with Shopware, status code ' . $responseCode);
-		} catch (ClientException $e) { // 4xx error
-			$response = $e->getResponse();
-			$this->logger->error('Shopware relation deletion failed on SW, response: ' . $response->getBody()->getContents());
-			throw new \Exception('Shopware relation deletion failed on SW, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
-		} catch (\Exception $e) {
-			$this->logger->error('Shopware relation deletion failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
-			throw new \Exception('Shopware relation deletion failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			$this->logger->error('Shopware sync failed in php, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			throw new \Exception('Shopware sync failed in php, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
 		}
 	}
 
@@ -202,7 +154,7 @@ class ShopwareService
 
 		$idsToDelete = $this->getIdsToDelete(
 			$entityName,
-			array_map(fn ($entity) => $entity->id ?? $entity->id(), $entitiesToKeep),
+			array_map(fn($entity) => $entity->id ?? $entity->id(), $entitiesToKeep),
 			(int) $_ENV['REMOVE_ORPHANTS_LIMIT'] ?? 100
 		);
 
@@ -222,7 +174,7 @@ class ShopwareService
 					[
 						'entity' => $entityName,
 						'action' => 'delete',
-						'payload' => array_map(fn ($id) => ['id' => $id], $idsToDelete),
+						'payload' => array_map(fn($id) => ['id' => $id], $idsToDelete),
 					]
 				],
 			]);
@@ -243,10 +195,10 @@ class ShopwareService
 	}
 
 	/**
-	 * Get ids of all entities
+	 * Get ids of entities that are no more resepresent in the source to delete them from SW
 	 * 
 	 * @param string $entityName
-	 * @param int $limit
+	 * @param array $idsToKeep
 	 * @param int $page
 	 * 
 	 * @return array<int>
@@ -267,6 +219,30 @@ class ShopwareService
 		}
 
 		return $idsToDelete;
+	}
+
+	/**
+	 * Remove all products from categories that are synced with SW
+	 */
+	public function removeAllProductsFromCategories(CategoryCollection $categories): void
+	{
+		$this->logger->info("Removing all products from synced categories in Shopware");
+
+		$categories = $categories->toArray();
+
+		$this->logger->info("Removing products from " . count($categories) . " categories in Shopware");
+
+		$deleteCount = 0;
+
+		do {
+			$deleted = $this->genericDelete('product_category', [
+				new SearchFilter(SearchType::EQUALS_ANY, 'category.id', array_map(fn($category) => $category->id, $categories)),
+			]);
+
+			$deleteCount += $deleted;
+		} while ($deleted > 0);
+
+		$this->logger->info("Removed $deleteCount products from categories in Shopware");
 	}
 
 	/**
@@ -296,7 +272,7 @@ class ShopwareService
 				throw new \Exception('Shopware sync failed');
 			}
 
-			$ids = array_map(fn ($entity) => $entity['id'], $response['data']);
+			$ids = array_map(fn($entity) => $entity['id'], $response['data']);
 		} catch (\Exception $e) {
 			throw new \Exception('Shopware sync failed');
 		}
@@ -341,7 +317,7 @@ class ShopwareService
 				throw new \Exception('Failed to get entities from Shopware, response code: ' . $responseCode);
 			}
 
-			$entities = array_map(fn ($entity) => $entityClass::fromSWResponse($entity), $response['data']);
+			$entities = array_map(fn($entity) => $entityClass::fromSWResponse($entity), $response['data']);
 		} catch (\Exception $e) {
 			throw new \Exception('Failed to get entities from Shopware, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
 		}
@@ -375,6 +351,107 @@ class ShopwareService
 			$this->logger->info("Set order status to $status for order $orderId");
 		} catch (\Exception $e) {
 			$this->logger->error("Failed to set order status for order $orderId, message: " . $e->getMessage() . ', code: ' . $e->getCode());
+		}
+	}
+
+	/**
+	 * Delete entities from Shopware
+	 * 
+	 * @param array<Model> $entities
+	 */
+	public function deleteEntities(array $entities): void
+	{
+		if (count($entities) === 0) {
+			return;
+		}
+
+		$entityName = $entities[0]::name();
+
+		if ($entityName === null) {
+			throw new \Exception('Entity is local only and cannot be synced with Shopware');
+		}
+
+		$this->logger->info('Deleting ' . count($entities) . ' ' . $entityName . ' entities from Shopware');
+
+		try {
+			$payload = array_map(fn($entity) => $entity->serialize(), $entities);
+			$payload = array_map(fn($entity) => ['id' => $entity['id']], $payload);
+
+			if ($this->debugMode > 0) {
+				$this->logger->debug($entityName, $payload);
+			}
+
+			$response = $this->httpClient->post('_action/sync', [
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->token
+				],
+				'json' => [
+					[
+						'entity' => $entityName,
+						'action' => 'delete',
+						'payload' => $payload,
+					]
+				],
+			]);
+
+			$responseCode = $response->getStatusCode();
+			//$response = json_decode($response->getBody()->getContents(), true);
+
+			if ($responseCode > 299 || $responseCode < 200) {
+				$this->logger->error('Shopware sync failed: bad response code: ' . $responseCode);
+				throw new \Exception('Shopware sync failed: bad response code: ' . $responseCode);
+			}
+
+			$this->logger->info('Successfully deleted ' . count($entities) . ' ' . $entityName . ' entities from Shopware, status code ' . $responseCode);
+		} catch (ClientException $e) { // 4xx error
+			$response = $e->getResponse();
+			$this->logger->error('Shopware sync failed on SW, response: ' . $response->getBody()->getContents());
+			throw new \Exception('Shopware sync failed on SW, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+		} catch (ServerException $e) {
+			$this->logger->error('Shopware sync failed on server, response: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			$this->logger->error('Request: ' . $e->getRequest()->getBody()->getContents());
+			$this->logger->error('Response: ' . $e->getResponse()->getBody()->getContents());
+		}
+	}
+
+	/**
+	 * Generic delete method
+	 * 
+	 * @param string $name
+	 * @param array<SearchFilter> $filters
+	 */
+	public function genericDelete(string $name, array $filters): int
+	{
+		try {
+			$payload = [
+				"entity" => $name,
+				"action" => "delete",
+				"criteria" => array_map(fn($filter) => $filter->serialize(), $filters)
+			];
+
+			$response = $this->httpClient->post('_action/sync', [
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->token,
+				],
+				"json" => ["deletion" => $payload]
+			]);
+
+			$responseCode = $response->getStatusCode();
+			$response = json_decode($response->getBody()->getContents(), true);
+
+			if ($responseCode > 299 || $responseCode < 200) {
+				throw new \Exception('Failed to get entities from Shopware, response code: ' . $responseCode);
+			}
+
+			if (isset($response['deleted']) && isset($response['deleted'][$name])) {
+				return count($response['deleted'][$name]);
+			}
+
+			return 0;
+		} catch (\Exception $e) {
+			$this->logger->error('Failed to delete entities from Shopware');
+			$this->logger->error('Response: ' . $e->getResponse()->getBody()->getContents());
+			throw new \Exception('Failed to delete entities from Shopware, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
 		}
 	}
 

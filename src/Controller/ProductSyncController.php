@@ -89,7 +89,11 @@ class ProductSyncController extends Controller
 		if ($this->options['with-categories']) {
 			$this->logger->info("Setting categories");
 			$categories = Category::fromCSV($data['categories']);
+
 			$products->addCategories($categories);
+
+			$this->logger->info("Löschen aller Produkt-Kategorie-Beziehungen");
+			$this->shopwareService->removeAllProductsFromCategories($categories);
 
 			$this->logger->info("Syncing categories with Shopware");
 			$this->shopwareService->syncEntities($categories->toArray());

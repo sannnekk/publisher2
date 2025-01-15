@@ -20,6 +20,8 @@ class Category extends Model
 	public bool $displayNestedProducts = true;
 	public bool $active = true;
 
+	private bool $empty = false;
+
 	/**
 	 * @var array<string, Category>
 	 */
@@ -66,9 +68,14 @@ class Category extends Model
 		return $leafIds;
 	}
 
+	public function makeEmpty(): void
+	{
+		$this->empty = true;
+	}
+
 	public function serialize(): array
 	{
-		return [
+		$serialized = [
 			'id' => $this->id,
 			'name' => $this->name,
 			'parentId' => $this->parentId,
@@ -79,6 +86,12 @@ class Category extends Model
 			'displayNestedProducts' => $this->displayNestedProducts,
 			'active' => $this->active,
 		];
+
+		if ($this->empty) {
+			$serialized['products'] = [];
+		}
+
+		return $serialized;
 	}
 
 	/**

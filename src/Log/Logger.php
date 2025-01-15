@@ -21,7 +21,7 @@ class Logger implements LoggerInterface
 		}
 
 		$this->logFile = 'logs/' . self::$sriptStartTime->format('Y-m-d_H_i_s') . '.log';
-		$this->debugFile = 'logs/debug_' . self::$sriptStartTime->format('Y-m-d_H_i_s') . '.log';
+		$this->debugFile = 'logs/' . self::$sriptStartTime->format('Y-m-d_H_i_s') . '_debug.log';
 		$this->nestingLevel = $nestingLevel;
 
 		if (!file_exists('logs')) {

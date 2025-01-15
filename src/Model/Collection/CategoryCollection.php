@@ -71,4 +71,23 @@ class CategoryCollection extends EntityCollection
 
 		return $flattened;
 	}
+
+	/**
+	 * Get the root category ids
+	 * 
+	 * @return array<string>
+	 */
+	public function getRootCategories(): array
+	{
+		$categories = $this->toArray();
+		$rootCategories = [];
+
+		foreach ($categories as $category) {
+			if ($category->parentId === $_ENV['SW_ROOT_CATEGORY_ID']) {
+				$rootCategoryIds[] = $category;
+			}
+		}
+
+		return $rootCategoryIds;
+	}
 }
