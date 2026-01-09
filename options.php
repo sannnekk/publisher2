@@ -6,7 +6,7 @@ $CLI_OPTIONS = [
 		'remove-orphans' => [
 			'type' => 'boolean',
 			'default' => false,
-			'description' => 'Sollen auch Produkte gelöscht werden, die nicht mehr in der Quelle existieren?',
+			'description' => 'Von FTP gelöschte Produkte auch im Shop löschen',
 			'alias' => ['r']
 		],
 		'sort-x-out' => [
@@ -38,6 +38,12 @@ $CLI_OPTIONS = [
 			'default' => false,
 			'description' => 'Sollen auch die Verfügbarkeiten synchronisiert werden?',
 			'alias' => ['s']
+		],
+		'ts-min-3' => [
+			'type' => 'boolean',
+			'default' => false,
+			'description' => 'Mindestbestellmenge bei Endkunden für ts6500-6524 auf 3 setzen',
+			'alias' => ['ts']
 		],
 	],
 	'complete-orders' => [

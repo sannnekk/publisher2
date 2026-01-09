@@ -131,7 +131,7 @@ class ProductCollection extends EntityCollection
 		foreach ($this as $productNumber => &$product) {
 			$productCategories = $categories[$productNumber] ?? [];
 
-			$leafCategoryIds = array_map(fn ($category) => $category->getLeafIds(), $productCategories);
+			$leafCategoryIds = array_map(fn($category) => $category->getLeafIds(), $productCategories);
 
 			// Flatten the array
 			$leafCategoryIds = array_reduce($leafCategoryIds, 'array_merge', []);
@@ -164,6 +164,38 @@ class ProductCollection extends EntityCollection
 
 			$product->addMedia($image);
 		}
+	}
+
+	public function setMinOrderQuantity(string $startProductNumber, string $endProductNumber, $minPurchase): void
+	{
+		// get letters from product number
+		$startPrefix = preg_replace('/[^a-zA-ZäöüÄÖÜß]/u', '', $startProductNumber);
+		$endPrefix = preg_replace('/[^a-zA-ZäöüÄÖÜß]/u', '', $endProductNumber);
+
+		if ($startPrefix !== $endPrefix) {
+			throw new \InvalidArgumentException("The product numbers must have the same prefix");
+		}
+
+		$startNumber = (int) filter_var($startProductNumber, FILTER_SANITIZE_NUMBER_INT);
+		$endNumber = (int) filter_var($endProductNumber, FILTER_SANITIZE_NUMBER_INT);
+
+		$count = 0;
+
+		foreach ($this as $productNumber => &$product) {
+			$prefix = preg_replace('/[^a-zA-ZäöüÄÖÜß]/u', '', $productNumber);
+			$number = (int) filter_var($productNumber, FILTER_SANITIZE_NUMBER_INT);
+
+			if ($prefix !== $startPrefix) {
+				continue;
+			}
+
+			if ($number >= $startNumber && $number <= $endNumber) {
+				$product->actualMinPurchase = $minPurchase;
+				$count++;
+			}
+		}
+
+		$this->logger->info("Set min purchase to $minPurchase for $count products with prefix $startProductNumber to $endProductNumber");
 	}
 
 	/**

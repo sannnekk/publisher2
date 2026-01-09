@@ -18,6 +18,7 @@ class Product extends Model
 	public int $stock = 0;
 	public int $restockTime = 1;
 	public int $minPurchase = 1;
+	public int $actualMinPurchase = 1;
 	public int $purchaseSteps = 3;
 	public string $ean = "";
 	public ?\DateTime $releaseDate = null;
@@ -103,7 +104,7 @@ class Product extends Model
 	 */
 	public function addCategoryIds(array $categoryIds): void
 	{
-		$this->categoryIds = array_map(fn ($id) => ["id" => $id], $categoryIds);
+		$this->categoryIds = array_map(fn($id) => ["id" => $id], $categoryIds);
 	}
 
 	public function dontSyncCategories(): void
@@ -152,9 +153,9 @@ class Product extends Model
 			'releaseDate' => $this->releaseDate->format($_ENV['DATE_FORMAT']),
 			'active' => $this->active,
 			'isCloseout' => $this->isCloseout,
-			'price' => array_map(fn ($price) => $price->serialize(), $this->price),
-			'prices' => array_map(fn ($price) => $price->serialize(), $this->prices),
-			'visibilities' => array_map(fn ($visibility) => $visibility->serialize(), $this->visibilities),
+			'price' => array_map(fn($price) => $price->serialize(), $this->price),
+			'prices' => array_map(fn($price) => $price->serialize(), $this->prices),
+			'visibilities' => array_map(fn($visibility) => $visibility->serialize(), $this->visibilities),
 			'customSearchKeywords' => $this->customSearchKeywords,
 			'cmsPageId' => $this->cmsPageId,
 			'taxId' => $this->taxId,
@@ -164,10 +165,9 @@ class Product extends Model
 			// as Shopware doesnt allow to have different minPurchase and purchaseSteps for different customer groups.
 			// An extension in Shopware called 'HMnetCartRecalculator' is needed to make this work.
 			// The value of manufacturerNumber is a string that contains actual minPurchase and purchaseSteps separated by '|'.
-			// minPurchase MUST be 1
 			// purchaseSteps MUST be 1
 			'manufacturerNumber' => $this->getManufacturerNumber(),
-			'minPurchase' => 1,
+			'minPurchase' => $this->actualMinPurchase,
 			'purchaseSteps' => 1,
 		];
 
@@ -177,7 +177,7 @@ class Product extends Model
 
 		if (!empty($this->coverId)) {
 			$serialized['coverId'] = $this->coverId;
-			$serialized['media'] = array_map(fn ($media) => $media->serialize(), $this->media);
+			$serialized['media'] = array_map(fn($media) => $media->serialize(), $this->media);
 		}
 
 		return $serialized;
@@ -251,7 +251,7 @@ class Product extends Model
 
 		foreach ($csv as $row) {
 			$productNumber = self::productNumberFromCSV($row);
-			$priceRows = array_filter($prices, fn ($priceRow) => $priceRow['TITEL_NR'] === $row['TITEL_NR']);
+			$priceRows = array_filter($prices, fn($priceRow) => $priceRow['TITEL_NR'] === $row['TITEL_NR']);
 
 			if (count($priceRows) === 0) {
 				continue;

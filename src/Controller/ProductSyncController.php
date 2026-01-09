@@ -108,6 +108,11 @@ class ProductSyncController extends Controller
 			// upload the images after the products are synced
 		}
 
+		if ($this->options['ts-min-3']) {
+			$this->logger->info("Setting min order quantity to 3 for ts6500-6524");
+			$products->setMinOrderQuantity('ndts6500', 'ndts6524', 3);
+		}
+
 		// 8. Sync products
 		$this->logger->info("Syncing products with Shopware");
 		$this->shopwareService->syncEntities($products->toArray());

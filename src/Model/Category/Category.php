@@ -87,6 +87,12 @@ class Category extends Model
 			'active' => $this->active,
 		];
 
+		// if a parent is a root category, add "type": "link"
+		// to not allow a user to access the category, but only the redirect
+		if ($this->parentId === $_ENV['SW_ROOT_CATEGORY_ID']) {
+			$serialized['type'] = 'link';
+		}
+
 		if ($this->empty) {
 			$serialized['products'] = [];
 		}

@@ -42,7 +42,7 @@ class CompleteOrdersController extends Controller
 		$criteria = new Criteria(1, $options['limit']);
 
 		$dateFilter = new Filter('range', 'orderDateTime', null, [
-			'gte' => (new \DateTime())->modify('-2 days'),
+			'gte' => (new \DateTime())->modify('-15 days'),
 		]);
 		$idFilter = new Filter('equalsAny', 'stateMachineState.id', $_ENV['SW_ORDER_COMPLETE_STATE_ID']);
 
