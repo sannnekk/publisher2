@@ -45,6 +45,12 @@ $CLI_OPTIONS = [
 			'description' => 'Mindestbestellmenge bei Endkunden für ts6500-6524 auf 3 setzen',
 			'alias' => ['ts']
 		],
+		'remove-orphan-categories' => [
+			'type' => 'boolean',
+			'default' => false,
+			'description' => 'Von FTP gelöschte Kategorien auch im Shop löschen',
+			'alias' => ['rc']
+		]
 	],
 	'complete-orders' => [
 		'limit' => [

@@ -128,6 +128,12 @@ class ProductSyncController extends Controller
 			$this->shopwareService->removeOrphants($products->toArray());
 		}
 
+		// 11. Remove orphan categories if option is set
+		if ($this->options['remove-orphan-categories']) {
+			$this->logger->info("Removing orphan categories");
+			$this->shopwareService->removeOrphantCategories($categories->toArray());
+		}
+
 		return $statistics;
 	}
 }

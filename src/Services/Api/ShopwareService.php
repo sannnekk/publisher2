@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace HMnet\Publisher2\Services\Api;
 
-use Category;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ServerException;
 use HMnet\Publisher2\Log\LoggerInterface;
 use HMnet\Publisher2\Log\Logger;
 use HMnet\Publisher2\Model\Collection\CategoryCollection;
+use HMnet\Publisher2\Model\Local\Criteria\Filter;
 use HMnet\Publisher2\Model\Model;
 use HMnet\Publisher2\Model\Local\Criteria\Criteria;
 use HMnet\Publisher2\Model\Product\ProductMedia;
 use HMnet\Publisher2\Model\Search\SearchFilter;
 use HMnet\Publisher2\Model\Search\SearchType;
+use HMnet\Publisher2\Model\Category\Category;
 
 class ShopwareService
 {
@@ -195,6 +196,88 @@ class ShopwareService
 	}
 
 	/**
+	 * Remove categories that are not in the list of categories to keep
+	 */
+	public function removeOrphantCategories(array $categories): void
+	{
+		if (count($categories) === 0) {
+			return;
+		}
+
+		$idsToDelete = $this->getCategoryIdsToDelete(
+			array_map(fn($entity) => $entity->id ?? $entity->id(), $categories)
+		);
+
+		if (count($idsToDelete) === 0) {
+			$this->logger->info('No orphant categories to remove from Shopware');
+			return;
+		}
+
+		$this->logger->info('Removing ' . count($idsToDelete) . ' orphant categories from Shopware');
+
+		try {
+			$response = $this->httpClient->post('_action/sync', [
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->token,
+				],
+				'json' => [
+					[
+						'entity' => 'category',
+						'action' => 'delete',
+						'payload' => array_values(array_map(fn($id) => ['id' => $id], $idsToDelete)),
+					]
+				],
+			]);
+
+			$this->logger->info('Sent request to remove orphant categories from Shopware, waiting for response...');
+			
+
+			$responseCode = $response->getStatusCode();
+			$response = json_decode($response->getBody()->getContents(), true);
+
+			if ($responseCode > 299 || $responseCode < 200) {
+				$this->logger->error('Removal of orphans failed, status code ' . $responseCode . ', response: ' . json_encode($response));
+				throw new \Exception('Removal of orphans failed');
+			}
+
+			$this->logger->info('Successfully removed ' . count($idsToDelete) . ' orphant categories from Shopware, status code ' . $responseCode);
+		} catch (\Exception $e) {
+			$this->logger->error('Removal of orphant categories failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+			throw new \Exception('Removal of orphant categories failed, message: ' . $e->getMessage() . ', code: ' . $e->getCode());
+		}
+	}
+
+	/**
+	 * Get ids of categories to delete
+	 * 
+	 * @param array<string> $categoryIds
+	 * @return array<string>
+	 */
+	public function getCategoryIdsToDelete(array $categoryIdsToKeep): array
+	{
+		$idsToDelete = [];
+		$filters = [];
+
+		foreach (explode('|', $_ENV['MANAGEABLE_CATS_LVL1']) as $catId) {
+			$filters[] = new Filter('contains', 'path', $catId);
+		}
+
+		$page = 1;
+		$limit = 500;
+		$filter = new Filter('multi', null, null, null, 'or', $filters);
+
+		$categories = $this->getEntities(Category::class, new Criteria($page, $limit, [$filter]));
+
+		while (count($categories) > 0) {
+			$idsToDelete = array_merge($idsToDelete, array_map(fn($cat) => $cat->id, $categories));
+			$page++;
+			$categories = $this->getEntities(Category::class, new Criteria($page, $limit, [$filter]));
+		}
+
+		return array_diff($idsToDelete, $categoryIdsToKeep);
+	}
+
+	/**
 	 * Get ids of entities that are no more resepresent in the source to delete them from SW
 	 * 
 	 * @param string $entityName
@@ -269,12 +352,12 @@ class ShopwareService
 			$response = json_decode($response->getBody()->getContents(), true);
 
 			if ($responseCode > 299 || $responseCode < 200) {
-				throw new \Exception('Shopware sync failed');
+				throw new \Exception('Shopware sync failed, response: ' . $responseCode . ''. $response->getBody()->getContents());
 			}
 
 			$ids = array_map(fn($entity) => $entity['id'], $response['data']);
 		} catch (\Exception $e) {
-			throw new \Exception('Shopware sync failed');
+			throw $e;
 		}
 
 		return $ids;

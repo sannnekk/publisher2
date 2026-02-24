@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace HMnet\Publisher2\Model\Category;
 
+use HMnet\Publisher2\Model\IConstructableFromSWResponse;
 use HMnet\Publisher2\Model\Model;
 use HMnet\Publisher2\Model\Product\Product;
 use HMnet\Publisher2\Model\Collection\CategoryCollection;
 
-class Category extends Model
+class Category extends Model implements IConstructableFromSWResponse
 {
 	public string $id;
 	public string $name;
@@ -19,7 +20,7 @@ class Category extends Model
 	public string $cmsPageId;
 	public bool $displayNestedProducts = true;
 	public bool $active = true;
-
+	public string $path;
 	private bool $empty = false;
 
 	/**
@@ -145,5 +146,30 @@ class Category extends Model
 			$parentId = $tree[$part]->id;
 			$tree = &$tree[$part]->children;
 		}
+	}
+
+	/**
+	 * Summary of fromSWResponse
+	 * 
+	 * @param array<array<mixed>> $response
+	 */
+	public static function fromSWResponse(array $response): self
+	{
+		$category = new self(
+			$response['id'],
+			$response['name'],
+			$response['parentId'] ?? null,
+		);
+
+		$category->productAssignmentType = 'product';
+		$category->type = 'page';
+		$category->salesChannelId = $_ENV['SW_SALES_CHANNEL_ID'];
+		$category->cmsPageId = $response['cmsPageId'] ?? $_ENV['SW_CATEGORY_LAYOUT_ID'];
+		$category->displayNestedProducts = $response['displayNestedProducts'] ?? true;
+		$category->active = $response['active'] ?? true;
+		$category->path = $response['path'] ?? '';
+		$category->empty = false;
+
+		return $category;
 	}
 }

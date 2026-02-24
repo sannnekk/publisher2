@@ -7,16 +7,24 @@ namespace HMnet\Publisher2\Model\Local\Criteria;
 class Filter
 {
 	private string $type;
-	private string $field;
+	private ?string $field;
 	private ?string $value;
 	private ?array $parameters;
+	private ?string $operator;
 
-	public function __construct(string $type, string $field, ?string $value = null, ?array $parameters = null)
+	/**
+	 * @var array<Filter>
+	 */
+	private ?array $queries;
+
+	public function __construct(string $type, ?string $field, ?string $value = null, ?array $parameters = null, ?string $operator = null, ?array $queries = null)
 	{
 		$this->type = $type;
 		$this->field = $field;
 		$this->value = $value;
+		$this->operator = $operator;
 		$this->parameters = $parameters;
+		$this->queries = $queries;
 	}
 
 	public function addParameter(string $key, mixed $value): void
@@ -36,8 +44,11 @@ class Filter
 	{
 		$serialized = [
 			'type' => $this->type,
-			'field' => $this->field,
 		];
+
+		if ($this->field) {
+			$serialized['field'] = $this->field;
+		}
 
 		if ($this->parameters) {
 			$serialized['parameters'] = $this->serializedParameters();
@@ -45,6 +56,14 @@ class Filter
 
 		if ($this->value) {
 			$serialized['value'] = $this->value;
+		}
+
+		if ($this->operator) {
+			$serialized['operator'] = $this->operator;
+		}
+
+		if ($this->queries) {
+			$serialized['queries'] = array_map(fn($query) => $query->serialize(), $this->queries);
 		}
 
 		return $serialized;
